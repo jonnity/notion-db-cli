@@ -21,5 +21,13 @@ jobs:
         uses: devcontainers/ci@v0.3
         with:
           push: never
-          runCmd: |
-            cargo test
+          runCmd: cargo test
+
+      - name: slack notification for test failures
+        if: ${{ failure() }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_TITLE: Fail to ${{ github.ref_name }} deploy
+          SLACK_COLOR: danger
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_MESSAGE: Fail to ${{ github.ref_name }} deploy
