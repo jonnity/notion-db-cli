@@ -49,6 +49,7 @@ pub struct DbItemGroup {
 
 fn main() {
     let cli = Cli::parse();
+    println!("specified token is {}", cli.token);
     match &cli.command {
         Commands::DbList => {
             println!("the list of databases will be displayed here");
