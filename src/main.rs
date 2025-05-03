@@ -8,7 +8,7 @@ struct Cli {
     command: Commands,
 
     /// Notion integration token
-    #[arg(long, env, hide_env_values = true)]
+    #[arg(long, env = "NOTION_CLI_RS_TOKEN", hide_env_values = true)]
     token: String,
 }
 
