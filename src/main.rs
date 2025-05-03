@@ -1,6 +1,6 @@
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
-#[derive(Parser)]
+#[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
 #[command(arg_required_else_help = true)]
 struct Cli {
@@ -8,20 +8,63 @@ struct Cli {
     command: Commands,
 }
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 enum Commands {
-    /// test command
-    Test {
-        /// string for echo
-        test_string: String,
-    },
+    /// Show the list of databases
+    DbList,
+    /// Show the structure of the database matching the id specified by the argument
+    DbView(DbViewArgs),
+    /// Add the item to the database specified with id
+    DbAdd(DbAddArgs),
+}
+
+#[derive(Debug, Args)]
+struct DbViewArgs {
+    /// Target database id
+    id: String,
+}
+
+#[derive(Debug, Args)]
+struct DbAddArgs {
+    /// Target database id
+    id: String,
+    #[clap(flatten)]
+    item: DbItemGroup,
+}
+
+#[derive(Debug, Args)]
+#[group(required = true, multiple = false)]
+pub struct DbItemGroup {
+    /// specify the item to add with json string
+    #[clap(long)]
+    json: Option<String>,
+    /// specify the item to add with the file contents
+    #[clap(long)]
+    file_path: Option<String>,
 }
 
 fn main() {
     let cli = Cli::parse();
     match &cli.command {
-        Commands::Test { test_string } => {
-            println!("test_string is {}", test_string);
+        Commands::DbList => {
+            println!("the list of databases will be displayed here");
+        }
+        Commands::DbView(args) => {
+            println!(
+                "the structure of the database whose id is {} will be displayed here",
+                args.id
+            );
+        }
+        Commands::DbAdd(args) => {
+            println!(
+                "the bellow item will be added to the database whose id is {} here",
+                args.id
+            );
+            if let Some(json) = &args.item.json {
+                println!("{}", json)
+            } else if let Some(path) = &args.item.file_path {
+                println!("the contents of {}", path)
+            }
         }
     }
 }
