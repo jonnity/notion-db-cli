@@ -1,4 +1,8 @@
 use clap::{Args, Parser, Subcommand};
+use reqwest::{
+    blocking::{Body, Client},
+    header::{HeaderMap, HeaderValue},
+};
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -49,10 +53,26 @@ pub struct DbItemGroup {
 
 fn main() {
     let cli = Cli::parse();
-    println!("specified token is {}", cli.token);
     match &cli.command {
         Commands::DbList => {
-            println!("the list of databases will be displayed here");
+            let mut headers = HeaderMap::new();
+            headers.append(
+                reqwest::header::CONTENT_TYPE,
+                HeaderValue::from_static("application/json"),
+            );
+            headers.append("Notion-Version", HeaderValue::from_static("2022-06-28"));
+            let body = Body::from(
+                "{\"filter\": {\"value\": \"database\", \"property\": \"object\"}}".to_string(),
+            );
+            let response = Client::new()
+                .post("https://api.notion.com/v1/search")
+                .headers(headers)
+                .bearer_auth(&cli.token)
+                .body(body)
+                .send()
+                .unwrap();
+
+            println!("{}", response.text().unwrap());
         }
         Commands::DbView(args) => {
             println!(
