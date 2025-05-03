@@ -6,6 +6,10 @@ use clap::{Args, Parser, Subcommand};
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+
+    /// Notion integration token
+    #[arg(long, env, hide_env_values = true)]
+    token: String,
 }
 
 #[derive(Debug, Subcommand)]
