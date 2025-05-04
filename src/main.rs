@@ -1,5 +1,8 @@
 use clap::{Args, Parser, Subcommand};
-use notion_client::endpoints::{Client as NotionClient, search::title::request};
+use notion_client::endpoints::{
+    Client as NotionClient,
+    search::title::{request, response::PageOrDatabase},
+};
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -68,7 +71,16 @@ async fn main() {
                 .await
                 .unwrap();
 
-            println!("{:#?}", response);
+            println!("the list of databases ({{title}}: {{id}}):");
+            for database in response.results {
+                if let PageOrDatabase::Database(database) = database {
+                    println!(
+                        "{}: {}",
+                        database.title[0].plain_text().expect("no title is set"),
+                        database.id.expect("no id is set")
+                    );
+                }
+            }
         }
         Commands::DbView(args) => {
             println!(
