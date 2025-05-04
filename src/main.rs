@@ -1,8 +1,5 @@
 use clap::{Args, Parser, Subcommand};
-use reqwest::{
-    blocking::{Body, Client},
-    header::{HeaderMap, HeaderValue},
-};
+use notion_client::endpoints::{Client as NotionClient, search::title::request};
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -51,28 +48,27 @@ pub struct DbItemGroup {
     file_path: Option<String>,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cli = Cli::parse();
+    let client = NotionClient::new(cli.token, None).unwrap();
     match &cli.command {
         Commands::DbList => {
-            let mut headers = HeaderMap::new();
-            headers.append(
-                reqwest::header::CONTENT_TYPE,
-                HeaderValue::from_static("application/json"),
-            );
-            headers.append("Notion-Version", HeaderValue::from_static("2022-06-28"));
-            let body = Body::from(
-                "{\"filter\": {\"value\": \"database\", \"property\": \"object\"}}".to_string(),
-            );
-            let response = Client::new()
-                .post("https://api.notion.com/v1/search")
-                .headers(headers)
-                .bearer_auth(&cli.token)
-                .body(body)
-                .send()
+            let database_list_request = request::SearchByTitleRequest {
+                filter: Some(request::Filter {
+                    value: request::FilterValue::Database,
+                    property: request::FilterProperty::Object,
+                }),
+                ..Default::default()
+            };
+
+            let response = client
+                .search
+                .search_by_title(database_list_request)
+                .await
                 .unwrap();
 
-            println!("{}", response.text().unwrap());
+            println!("{:#?}", response);
         }
         Commands::DbView(args) => {
             println!(
