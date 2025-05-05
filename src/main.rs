@@ -1,59 +1,13 @@
-use clap::{Args, Parser, Subcommand};
+use clap::Parser;
+use notion_cli_rs::commands::{CliArgs, Commands};
 use notion_client::endpoints::{
     Client as NotionClient,
     search::title::{request, response::PageOrDatabase},
 };
 
-#[derive(Debug, Parser)]
-#[command(version, about, long_about = None)]
-#[command(arg_required_else_help = true)]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-
-    /// Notion integration token
-    #[arg(long, env = "NOTION_CLI_RS_TOKEN", hide_env_values = true)]
-    token: String,
-}
-
-#[derive(Debug, Subcommand)]
-enum Commands {
-    /// Show the list of databases
-    DbList,
-    /// Show the structure of the database matching the id specified by the argument
-    DbView(DbViewArgs),
-    /// Add the item to the database specified with id
-    DbAdd(DbAddArgs),
-}
-
-#[derive(Debug, Args)]
-struct DbViewArgs {
-    /// Target database id
-    id: String,
-}
-
-#[derive(Debug, Args)]
-struct DbAddArgs {
-    /// Target database id
-    id: String,
-    #[clap(flatten)]
-    item: DbItemGroup,
-}
-
-#[derive(Debug, Args)]
-#[group(required = true, multiple = false)]
-pub struct DbItemGroup {
-    /// specify the item to add with json string
-    #[clap(long)]
-    json: Option<String>,
-    /// specify the item to add with the file contents
-    #[clap(long)]
-    file_path: Option<String>,
-}
-
 #[tokio::main]
 async fn main() {
-    let cli = Cli::parse();
+    let cli = CliArgs::parse();
     let client = NotionClient::new(cli.token, None).unwrap();
     match &cli.command {
         Commands::DbList => {
