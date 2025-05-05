@@ -1,12 +1,8 @@
 {
   "name": "Dev Container for notion-cli-rs",
-  "build": {
-    "dockerfile": "./Dockerfile",
-    "context": "."
-  },
-  "runArgs": ["--name=notion-cli-rs"],
+  "dockerComposeFile": "./docker-compose.yml",
+  "service": "dev",
   "workspaceFolder": "/usr/src/app",
-  "workspaceMount": "source=${localWorkspaceFolder},target=${containerWorkspaceFolder},type=bind,consistency=cached",
   "onCreateCommand": "rustup component add rustfmt clippy",
   "customizations": {
     "vscode": {
