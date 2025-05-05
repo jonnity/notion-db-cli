@@ -18,7 +18,8 @@ impl NotionClient {
         match client {
             Ok(client) => return Self { client: client },
             Err(e) => {
-                eprintln!("fail to obtain a client: {}", e);
+                eprintln!("fail to obtain a client.");
+                eprintln!("{}", e);
                 process::exit(1);
             }
         }

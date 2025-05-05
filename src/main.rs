@@ -14,7 +14,8 @@ async fn main() {
             let databases = client.list_database().await;
             match databases {
                 Err(e) => {
-                    eprint!("fail to obtain the list of databases: {}", e);
+                    eprintln!("fail to obtain the list of databases.");
+                    eprintln!("{}", e);
                     process::exit(1);
                 }
                 Ok(databases) => {
