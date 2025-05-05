@@ -17,6 +17,10 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: make .env to build devcontainer
+        # invalid token for example is set in .env.example, but no problem since it is not used
+        run: cp ./.devcontainer/.env.example ./.devcontainer/.env
+
       - name: Build and run Dev Container task
         uses: devcontainers/ci@v0.3
         with:
