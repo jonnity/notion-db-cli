@@ -48,4 +48,12 @@ impl NotionClient {
             }
         }
     }
+
+    pub async fn view_database(&self, database_id: &str) -> Result<Database, NotionClientError> {
+        let database = self.client.databases.retrieve_a_database(database_id).await;
+        match database {
+            Err(e) => return Err(e),
+            Ok(database) => return Ok(database),
+        }
+    }
 }
