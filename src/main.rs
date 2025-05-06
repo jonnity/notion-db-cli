@@ -31,10 +31,35 @@ async fn main() {
             }
         }
         Commands::DbView(args) => {
-            println!(
-                "the structure of the database whose id is {} will be displayed here",
-                args.id
-            );
+            let database = client.view_database(&args.id).await;
+            match database {
+                Err(e) => {
+                    eprintln!("fail to retrieve the databases information.");
+                    eprintln!("{}", e);
+                    process::exit(1);
+                }
+                Ok(database) => {
+                    println!("the structure and columns of the database are as follows:");
+
+                    // display the keys of properties
+                    print!("|");
+                    for (key, _) in &database.properties {
+                        print!(" {} |", key);
+                    }
+                    print!("\n");
+
+                    // display the structure of properties
+                    print!("|");
+                    for (_, property) in &database.properties {
+                        // TODO: properly display information on the property.
+                        match property {
+                            _ => print!(" String |"),
+                            // print!(" {} |",);
+                        }
+                    }
+                    print!("\n")
+                }
+            }
         }
         Commands::DbAdd(args) => {
             println!(
