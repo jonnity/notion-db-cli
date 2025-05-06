@@ -1,9 +1,6 @@
 use notion_client::{
     NotionClientError,
-    endpoints::{
-        Client,
-        search::title::{request, response::PageOrDatabase},
-    },
+    endpoints::{Client, search::title},
     objects::database::Database,
 };
 use std::process;
@@ -25,10 +22,10 @@ impl NotionClient {
         }
     }
     pub async fn list_database(&self) -> Result<Vec<Database>, NotionClientError> {
-        let list_database_request = request::SearchByTitleRequest {
-            filter: Some(request::Filter {
-                value: request::FilterValue::Database,
-                property: request::FilterProperty::Object,
+        let list_database_request = title::request::SearchByTitleRequest {
+            filter: Some(title::request::Filter {
+                value: title::request::FilterValue::Database,
+                property: title::request::FilterProperty::Object,
             }),
             ..Default::default()
         };
@@ -43,7 +40,7 @@ impl NotionClient {
             Ok(response) => {
                 let mut databases: Vec<Database> = vec![];
                 for page_or_database in response.results {
-                    if let PageOrDatabase::Database(database) = page_or_database {
+                    if let title::response::PageOrDatabase::Database(database) = page_or_database {
                         databases.push(database);
                     };
                 }
