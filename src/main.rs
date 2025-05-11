@@ -1,7 +1,7 @@
 use clap::Parser;
 use notion_cli_rs::{
     commands::{CliArgs, Commands},
-    operations::NotionClient,
+    operations::{NotionClient, PropertyInfo, database_to_properties_info},
 };
 use std::process;
 
@@ -40,24 +40,23 @@ async fn main() {
                 }
                 Ok(database) => {
                     println!("the structure and columns of the database are as follows:");
-
-                    // display the keys of properties
-                    print!("|");
-                    for (key, _) in &database.properties {
-                        print!(" {} |", key);
-                    }
-                    print!("\n");
-
-                    // display the structure of properties
-                    print!("|");
-                    for (_, property) in &database.properties {
-                        // TODO: properly display information on the property.
-                        match property {
-                            _ => print!(" String |"),
-                            // print!(" {} |",);
-                        }
-                    }
-                    print!("\n")
+                    let properties = database_to_properties_info(&database); // TODO: improve the text
+                    let mut property_keys_row = "| ".to_string();
+                    let mut property_type_row = "| ".to_string();
+                    properties.iter().for_each(|property| {
+                        let property_type = format!("{:#?}", property.r#type);
+                        let name_len = property.name.chars().count();
+                        let type_len = property_type.chars().count();
+                        let max_len = name_len.max(type_len);
+                        let pudded_key =
+                            format!(" {:<width$} |", property.name, width = max_len).to_string();
+                        let pudded_type =
+                            format!(" {:<width$} |", property_type, width = max_len).to_string();
+                        property_keys_row += &pudded_key;
+                        property_type_row += &pudded_type;
+                    });
+                    println!("{}", property_keys_row);
+                    println!("{}", property_type_row);
                 }
             }
         }
