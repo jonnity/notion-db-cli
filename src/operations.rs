@@ -1,7 +1,7 @@
 use notion_client::{
     NotionClientError,
     endpoints::{Client, search::title},
-    objects::database::Database,
+    objects::{database, property},
 };
 use std::process;
 
@@ -21,7 +21,7 @@ impl NotionClient {
             }
         }
     }
-    pub async fn list_database(&self) -> Result<Vec<Database>, NotionClientError> {
+    pub async fn list_database(&self) -> Result<Vec<database::Database>, NotionClientError> {
         let list_database_request = title::request::SearchByTitleRequest {
             filter: Some(title::request::Filter {
                 value: title::request::FilterValue::Database,
@@ -38,7 +38,7 @@ impl NotionClient {
         match response {
             Err(e) => return Err(e),
             Ok(response) => {
-                let mut databases: Vec<Database> = vec![];
+                let mut databases: Vec<database::Database> = vec![];
                 for page_or_database in response.results {
                     if let title::response::PageOrDatabase::Database(database) = page_or_database {
                         databases.push(database);
@@ -49,11 +49,32 @@ impl NotionClient {
         }
     }
 
-    pub async fn view_database(&self, database_id: &str) -> Result<Database, NotionClientError> {
+    pub async fn view_database(
+        &self,
+        database_id: &str,
+    ) -> Result<database::Database, NotionClientError> {
         let database = self.client.databases.retrieve_a_database(database_id).await;
         match database {
             Err(e) => return Err(e),
             Ok(database) => return Ok(database),
         }
     }
+}
+
+pub struct PropertyInfo {
+    pub name: String,
+    pub r#type: database::DatabaseProperty,
+    pub example: String,
+}
+
+pub fn database_to_properties_info(database: &database::Database) -> Vec<PropertyInfo> {
+    database
+        .properties
+        .iter()
+        .map(|(name, property)| PropertyInfo {
+            name: name.clone(),
+            r#type: property.clone(),
+            example: "foo".to_string(),
+        })
+        .collect()
 }
