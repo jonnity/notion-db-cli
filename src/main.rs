@@ -39,23 +39,29 @@ async fn main() {
                     process::exit(1);
                 }
                 Ok(database) => {
-                    println!("the structure and columns of the database are as follows:");
-                    let properties = database_to_properties_info(&database); // TODO: improve the text
-                    let mut property_keys_row = "|".to_string();
-                    let mut property_type_row = "|".to_string();
-                    properties.iter().for_each(|property| {
-                        let name_len = property.name.chars().count();
-                        let type_len = property.r#type.chars().count();
-                        let max_len = name_len.max(type_len);
-                        let pudded_key =
-                            format!(" {:<width$} |", property.name, width = max_len).to_string();
-                        let pudded_type =
-                            format!(" {:<width$} |", property.r#type, width = max_len).to_string();
-                        property_keys_row += &pudded_key;
-                        property_type_row += &pudded_type;
-                    });
-                    println!("{}", property_keys_row);
-                    println!("{}", property_type_row);
+                    if let Some(file_path) = &args.file {
+                        // TODO: construct csv contents and write to the file
+                    } else {
+                        println!("the structure and columns of the database are as follows:");
+                        let properties = database_to_properties_info(&database); // TODO: improve the text
+                        let mut property_keys_row = "|".to_string();
+                        let mut property_type_row = "|".to_string();
+                        properties.iter().for_each(|property| {
+                            let name_len = property.name.chars().count();
+                            let type_len = property.r#type.chars().count();
+                            let max_len = name_len.max(type_len);
+                            let pudded_key =
+                                format!(" {:<width$} |", property.name, width = max_len)
+                                    .to_string();
+                            let pudded_type =
+                                format!(" {:<width$} |", property.r#type, width = max_len)
+                                    .to_string();
+                            property_keys_row += &pudded_key;
+                            property_type_row += &pudded_type;
+                        });
+                        println!("{}", property_keys_row);
+                        println!("{}", property_type_row);
+                    }
                 }
             }
         }
