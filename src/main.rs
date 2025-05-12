@@ -1,7 +1,7 @@
 use clap::Parser;
 use notion_cli_rs::{
     commands::{CliArgs, Commands},
-    operations::{NotionClient,  database_to_properties_info},
+    operations::{NotionClient, database_to_properties_info},
 };
 use std::process;
 
@@ -66,7 +66,7 @@ async fn main() {
             );
             if let Some(json) = &args.item.json {
                 println!("{}", json)
-            } else if let Some(path) = &args.item.file_path {
+            } else if let Some(path) = &args.item.file {
                 println!("the contents of {}", path)
             }
         }
