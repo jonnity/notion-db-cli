@@ -1,7 +1,7 @@
 use notion_client::{
     NotionClientError,
     endpoints::{Client, search::title},
-    objects::{database, property},
+    objects::database,
 };
 use std::process;
 
@@ -63,7 +63,7 @@ impl NotionClient {
 
 pub struct PropertyInfo {
     pub name: String,
-    pub r#type: database::DatabaseProperty,
+    pub r#type: String,
     pub example: String,
 }
 
@@ -73,8 +73,29 @@ pub fn database_to_properties_info(database: &database::Database) -> Vec<Propert
         .iter()
         .map(|(name, property)| PropertyInfo {
             name: name.clone(),
-            r#type: property.clone(),
             example: "foo".to_string(),
+            r#type: match *property {
+                database::DatabaseProperty::Checkbox { .. } => "Checkbox".to_string(),
+                database::DatabaseProperty::CreatedBy { .. } => "CreatedBy".to_string(),
+                database::DatabaseProperty::CreatedTime { .. } => "CreatedTime".to_string(),
+                database::DatabaseProperty::Date { .. } => "Date".to_string(),
+                database::DatabaseProperty::Email { .. } => "Email".to_string(),
+                database::DatabaseProperty::Files { .. } => "Files".to_string(),
+                database::DatabaseProperty::Formula { .. } => "Formula".to_string(),
+                database::DatabaseProperty::LastEditedBy { .. } => "LastEditedBy".to_string(),
+                database::DatabaseProperty::LastEditedTime { .. } => "LastEditedTime".to_string(),
+                database::DatabaseProperty::MultiSelect { .. } => "MultiSelect".to_string(),
+                database::DatabaseProperty::Number { .. } => "Number".to_string(),
+                database::DatabaseProperty::People { .. } => "People".to_string(),
+                database::DatabaseProperty::PhoneNumber { .. } => "PhoneNumber".to_string(),
+                database::DatabaseProperty::Relation { .. } => "Relation".to_string(),
+                database::DatabaseProperty::RichText { .. } => "RichText".to_string(),
+                database::DatabaseProperty::Rollup { .. } => "Rollup".to_string(),
+                database::DatabaseProperty::Select { .. } => "Select".to_string(),
+                database::DatabaseProperty::Status { .. } => "Status".to_string(),
+                database::DatabaseProperty::Title { .. } => "Title".to_string(),
+                database::DatabaseProperty::Url { .. } => "Url".to_string(),
+            },
         })
         .collect()
 }

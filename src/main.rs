@@ -1,7 +1,7 @@
 use clap::Parser;
 use notion_cli_rs::{
     commands::{CliArgs, Commands},
-    operations::{NotionClient, PropertyInfo, database_to_properties_info},
+    operations::{NotionClient,  database_to_properties_info},
 };
 use std::process;
 
@@ -41,17 +41,16 @@ async fn main() {
                 Ok(database) => {
                     println!("the structure and columns of the database are as follows:");
                     let properties = database_to_properties_info(&database); // TODO: improve the text
-                    let mut property_keys_row = "| ".to_string();
-                    let mut property_type_row = "| ".to_string();
+                    let mut property_keys_row = "|".to_string();
+                    let mut property_type_row = "|".to_string();
                     properties.iter().for_each(|property| {
-                        let property_type = format!("{:#?}", property.r#type);
                         let name_len = property.name.chars().count();
-                        let type_len = property_type.chars().count();
+                        let type_len = property.r#type.chars().count();
                         let max_len = name_len.max(type_len);
                         let pudded_key =
                             format!(" {:<width$} |", property.name, width = max_len).to_string();
                         let pudded_type =
-                            format!(" {:<width$} |", property_type, width = max_len).to_string();
+                            format!(" {:<width$} |", property.r#type, width = max_len).to_string();
                         property_keys_row += &pudded_key;
                         property_type_row += &pudded_type;
                     });
