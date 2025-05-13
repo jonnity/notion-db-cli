@@ -3,7 +3,7 @@ use notion_client::{
     endpoints::{Client, search::title},
     objects::database,
 };
-use std::process;
+use std::{option, process};
 
 pub struct NotionClient {
     client: Client,
@@ -71,30 +71,122 @@ pub fn database_to_properties_info(database: &database::Database) -> Vec<Propert
     database
         .properties
         .iter()
-        .map(|(name, property)| PropertyInfo {
-            name: name.clone(),
-            example: "foo".to_string(),
-            r#type: match *property {
-                database::DatabaseProperty::Checkbox { .. } => "Checkbox",
-                database::DatabaseProperty::CreatedBy { .. } => "CreatedBy",
-                database::DatabaseProperty::CreatedTime { .. } => "CreatedTime",
-                database::DatabaseProperty::Date { .. } => "Date",
-                database::DatabaseProperty::Email { .. } => "Email",
-                database::DatabaseProperty::Files { .. } => "Files",
-                database::DatabaseProperty::Formula { .. } => "Formula",
-                database::DatabaseProperty::LastEditedBy { .. } => "LastEditedBy",
-                database::DatabaseProperty::LastEditedTime { .. } => "LastEditedTime",
-                database::DatabaseProperty::MultiSelect { .. } => "MultiSelect",
-                database::DatabaseProperty::Number { .. } => "Number",
-                database::DatabaseProperty::People { .. } => "People",
-                database::DatabaseProperty::PhoneNumber { .. } => "PhoneNumber",
-                database::DatabaseProperty::Relation { .. } => "Relation",
-                database::DatabaseProperty::RichText { .. } => "RichText",
-                database::DatabaseProperty::Rollup { .. } => "Rollup",
-                database::DatabaseProperty::Select { .. } => "Select",
-                database::DatabaseProperty::Status { .. } => "Status",
-                database::DatabaseProperty::Title { .. } => "Title",
-                database::DatabaseProperty::Url { .. } => "Url",
+        .map(|(name, property)| match property {
+            database::DatabaseProperty::Checkbox { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "Checkbox",
+                example: "true / false".to_string(),
+            },
+            database::DatabaseProperty::CreatedBy { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "CreatedBy",
+                example: "-".to_string(),
+            },
+            database::DatabaseProperty::CreatedTime { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "CreatedTime",
+                example: "-".to_string(),
+            },
+            database::DatabaseProperty::Date { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "Date",
+                example: "2020-12-07T12:00:00Z / 2020-12-08T12:00:00Z - 2020-12-09T12:00:00Z"
+                    .to_string(),
+            },
+            database::DatabaseProperty::Email { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "Email",
+                example: "foo@example.com".to_string(),
+            },
+            database::DatabaseProperty::Files { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "Files",
+                example: "-".to_string(),
+            },
+            database::DatabaseProperty::Formula { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "Formula",
+                example: "-".to_string(),
+            },
+            database::DatabaseProperty::LastEditedBy { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "LastEditedBy",
+                example: "-".to_string(),
+            },
+            database::DatabaseProperty::LastEditedTime { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "LastEditedTime",
+                example: "-".to_string(),
+            },
+            database::DatabaseProperty::MultiSelect { multi_select, .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "MultiSelect",
+                example: multi_select
+                    .options
+                    .iter()
+                    .map(|option_value| option_value.name.clone())
+                    .collect::<Vec<String>>()
+                    .join(" / "),
+            },
+            database::DatabaseProperty::Number { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "Number",
+                example: "123".to_string(),
+            },
+            database::DatabaseProperty::People { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "People",
+                example: "-".to_string(),
+            },
+            database::DatabaseProperty::PhoneNumber { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "PhoneNumber",
+                example: "123-456-7890".to_string(),
+            },
+            database::DatabaseProperty::Relation { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "Relation",
+                example: "-".to_string(),
+            },
+            database::DatabaseProperty::RichText { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "RichText",
+                example: "-".to_string(),
+            },
+            database::DatabaseProperty::Rollup { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "Rollup",
+                example: "-".to_string(),
+            },
+            database::DatabaseProperty::Select { select, .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "Select",
+                example: select
+                    .options
+                    .iter()
+                    .map(|option_value| option_value.name.clone())
+                    .collect::<Vec<String>>()
+                    .join(" / "),
+            },
+            database::DatabaseProperty::Status { status, .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "Status",
+                example: status
+                    .groups
+                    .iter()
+                    .map(|group| group.name.clone())
+                    .collect::<Vec<String>>()
+                    .join(" / "),
+            },
+            database::DatabaseProperty::Title { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "Title",
+                example: "-".to_string(),
+            },
+            database::DatabaseProperty::Url { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "Url",
+                example: "https://jonnity.com".to_string(),
             },
         })
         .collect()
