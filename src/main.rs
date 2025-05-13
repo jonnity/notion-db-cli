@@ -1,8 +1,9 @@
+mod commands;
+mod operations;
+
 use clap::Parser;
-use notion_cli_rs::{
-    commands::{CliArgs, Commands},
-    operations::{NotionClient, database_to_properties_info},
-};
+use commands::{CliArgs, Commands};
+use operations::{NotionClient, database_to_properties_info};
 use std::process;
 
 #[tokio::main]
