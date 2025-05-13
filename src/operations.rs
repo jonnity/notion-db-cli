@@ -3,7 +3,7 @@ use notion_client::{
     endpoints::{Client, search::title},
     objects::database,
 };
-use std::{option, process};
+use std::process;
 
 pub struct NotionClient {
     client: Client,
@@ -75,7 +75,7 @@ pub fn database_to_properties_info(database: &database::Database) -> Vec<Propert
             database::DatabaseProperty::Checkbox { .. } => PropertyInfo {
                 name: name.clone(),
                 r#type: "Checkbox",
-                example: "true / false".to_string(),
+                example: "true/false".to_string(),
             },
             database::DatabaseProperty::CreatedBy { .. } => PropertyInfo {
                 name: name.clone(),
@@ -90,7 +90,7 @@ pub fn database_to_properties_info(database: &database::Database) -> Vec<Propert
             database::DatabaseProperty::Date { .. } => PropertyInfo {
                 name: name.clone(),
                 r#type: "Date",
-                example: "2020-12-07T12:00:00Z / 2020-12-08T12:00:00Z - 2020-12-09T12:00:00Z"
+                example: "2020-12-07T12:00:00Z/from 2020-12-08T12:00:00Z to 2020-12-09T12:00:00Z"
                     .to_string(),
             },
             database::DatabaseProperty::Email { .. } => PropertyInfo {
@@ -126,7 +126,7 @@ pub fn database_to_properties_info(database: &database::Database) -> Vec<Propert
                     .iter()
                     .map(|option_value| option_value.name.clone())
                     .collect::<Vec<String>>()
-                    .join(" / "),
+                    .join("/"),
             },
             database::DatabaseProperty::Number { .. } => PropertyInfo {
                 name: name.clone(),
@@ -166,7 +166,7 @@ pub fn database_to_properties_info(database: &database::Database) -> Vec<Propert
                     .iter()
                     .map(|option_value| option_value.name.clone())
                     .collect::<Vec<String>>()
-                    .join(" / "),
+                    .join("/"),
             },
             database::DatabaseProperty::Status { status, .. } => PropertyInfo {
                 name: name.clone(),
@@ -176,7 +176,7 @@ pub fn database_to_properties_info(database: &database::Database) -> Vec<Propert
                     .iter()
                     .map(|group| group.name.clone())
                     .collect::<Vec<String>>()
-                    .join(" / "),
+                    .join("/"),
             },
             database::DatabaseProperty::Title { .. } => PropertyInfo {
                 name: name.clone(),
