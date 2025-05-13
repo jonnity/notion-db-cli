@@ -40,11 +40,21 @@ async fn main() {
                     process::exit(1);
                 }
                 Ok(database) => {
+                    let properties = database_to_properties_info(&database); // TODO: improve the text
                     if let Some(file_path) = &args.file {
                         // TODO: construct csv contents and write to the file
+                        println!("following contents will be wrote in {}", file_path);
+                        let mut property_keys_row = "".to_string();
+                        let mut property_example_row = "".to_string();
+
+                        properties.iter().for_each(|property| {
+                            property_keys_row += &format!("{}, ", property.name).to_string();
+                            property_example_row += &format!("{}, ", property.example).to_string();
+                        });
+                        println!("{}", property_keys_row);
+                        println!("{}", property_example_row);
                     } else {
                         println!("the structure and columns of the database are as follows:");
-                        let properties = database_to_properties_info(&database); // TODO: improve the text
                         let mut property_keys_row = "|".to_string();
                         let mut property_type_row = "|".to_string();
                         properties.iter().for_each(|property| {
