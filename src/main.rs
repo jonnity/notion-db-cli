@@ -42,17 +42,20 @@ async fn main() {
                 Ok(database) => {
                     let properties = database_to_properties_info(&database); // TODO: improve the text
                     if let Some(file_path) = &args.file {
-                        // TODO: construct csv contents and write to the file
-                        println!("following contents will be wrote in {}", file_path);
-                        let mut property_keys_row = "".to_string();
-                        let mut property_example_row = "".to_string();
-
-                        properties.iter().for_each(|property| {
-                            property_keys_row += &format!("{}, ", property.name).to_string();
-                            property_example_row += &format!("{}, ", property.example).to_string();
-                        });
-                        println!("{}", property_keys_row);
-                        println!("{}", property_example_row);
+                        let property_keys: Vec<String> =
+                            properties.iter().map(|p| p.name.clone()).collect();
+                        let property_examples: Vec<String> =
+                            properties.iter().map(|p| p.example.clone()).collect();
+                        let property_keys_csv = property_keys.join(", ");
+                        let property_example_csv = property_examples.join(", ");
+                        let content = format!("{}\n{}", property_keys_csv, property_example_csv);
+                        match std::fs::write(file_path, content) {
+                            Ok(_) => println!("Successfully wrote to {}", file_path),
+                            Err(e) => {
+                                eprintln!("Failed to write to file: {}", e);
+                                process::exit(1);
+                            }
+                        }
                     } else {
                         println!("the structure and columns of the database are as follows:");
                         let mut property_keys_row = "|".to_string();
