@@ -1,8 +1,9 @@
+mod commands;
+mod operations;
+
 use clap::Parser;
-use notion_cli_rs::{
-    commands::{CliArgs, Commands},
-    operations::NotionClient,
-};
+use commands::{CliArgs, Commands};
+use operations::{NotionClient, database_to_properties_info};
 use std::process;
 
 #[tokio::main]
@@ -31,10 +32,52 @@ async fn main() {
             }
         }
         Commands::DbView(args) => {
-            println!(
-                "the structure of the database whose id is {} will be displayed here",
-                args.id
-            );
+            let database = client.view_database(&args.id).await;
+            match database {
+                Err(e) => {
+                    eprintln!("fail to retrieve the databases information.");
+                    eprintln!("{}", e);
+                    process::exit(1);
+                }
+                Ok(database) => {
+                    let properties = database_to_properties_info(&database); // TODO: improve the text
+                    if let Some(file_path) = &args.file {
+                        let property_keys: Vec<String> =
+                            properties.iter().map(|p| p.name.clone()).collect();
+                        let property_examples: Vec<String> =
+                            properties.iter().map(|p| p.example.clone()).collect();
+                        let property_keys_csv = property_keys.join(", ");
+                        let property_example_csv = property_examples.join(", ");
+                        let content = format!("{}\n{}", property_keys_csv, property_example_csv);
+                        match std::fs::write(file_path, content) {
+                            Ok(_) => println!("Successfully wrote to {}", file_path),
+                            Err(e) => {
+                                eprintln!("Failed to write to file: {}", e);
+                                process::exit(1);
+                            }
+                        }
+                    } else {
+                        println!("the structure and columns of the database are as follows:");
+                        let mut property_keys_row = "|".to_string();
+                        let mut property_type_row = "|".to_string();
+                        properties.iter().for_each(|property| {
+                            let name_len = property.name.chars().count();
+                            let type_len = property.r#type.chars().count();
+                            let max_len = name_len.max(type_len);
+                            let pudded_key =
+                                format!(" {:<width$} |", property.name, width = max_len)
+                                    .to_string();
+                            let pudded_type =
+                                format!(" {:<width$} |", property.r#type, width = max_len)
+                                    .to_string();
+                            property_keys_row += &pudded_key;
+                            property_type_row += &pudded_type;
+                        });
+                        println!("{}", property_keys_row);
+                        println!("{}", property_type_row);
+                    }
+                }
+            }
         }
         Commands::DbAdd(args) => {
             println!(
@@ -43,7 +86,7 @@ async fn main() {
             );
             if let Some(json) = &args.item.json {
                 println!("{}", json)
-            } else if let Some(path) = &args.item.file_path {
+            } else if let Some(path) = &args.item.file {
                 println!("the contents of {}", path)
             }
         }

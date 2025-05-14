@@ -26,6 +26,8 @@ pub enum Commands {
 pub struct DbViewArgs {
     /// Target database id
     pub id: String,
+    #[clap(long, short)]
+    pub file: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -44,5 +46,5 @@ pub struct DbItemGroup {
     pub json: Option<String>,
     /// specify the item to add with the file contents
     #[clap(long)]
-    pub file_path: Option<String>,
+    pub file: Option<String>,
 }
