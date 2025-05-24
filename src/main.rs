@@ -4,7 +4,7 @@ mod operations;
 use clap::Parser;
 use commands::{CliArgs, Commands};
 use operations::{NotionClient, database_to_properties_info};
-use std::process;
+use std::{fs::File, process};
 
 #[tokio::main]
 async fn main() {
@@ -87,7 +87,15 @@ async fn main() {
             if let Some(json) = &args.item.json {
                 println!("{}", json)
             } else if let Some(path) = &args.item.file {
-                println!("the contents of {}", path)
+                let file = File::open(path).unwrap();
+                let mut rdr = csv::ReaderBuilder::new()
+                    .has_headers(true)
+                    .trim(csv::Trim::All)
+                    .from_reader(file);
+                for result in rdr.records() {
+                    let record = result.unwrap();
+                    println!("{:?}", record);
+                }
             }
         }
     }
