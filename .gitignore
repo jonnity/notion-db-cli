@@ -17,3 +17,5 @@ target/
 #.idea/
 
 .devcontainer/.env
+
+*.csv
