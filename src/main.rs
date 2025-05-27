@@ -4,8 +4,7 @@ mod operations;
 use clap::Parser;
 use commands::{CliArgs, Commands};
 use operations::{NotionClient, database_to_properties_info};
-use reqwest::header;
-use std::{fs::File, process};
+use std::{collections::HashMap, fs::File, process};
 
 #[tokio::main]
 async fn main() {
@@ -94,7 +93,7 @@ async fn main() {
                     .trim(csv::Trim::All)
                     .from_reader(file);
                 let headers = match reader.headers() {
-                    Ok(headers) => headers,
+                    Ok(headers) => headers.clone(),
                     Err(e) => {
                         eprintln!("fail to read headers from csv.");
                         eprintln!("{}", e);
@@ -121,6 +120,33 @@ async fn main() {
                         eprintln!("the key {} is missing in the csv.", key);
                     }
                 });
+
+                for record in reader.records() {
+                    let record = match record {
+                        Ok(record) => record,
+                        Err(e) => {
+                            eprintln!("fail to read a record in csv.");
+                            eprintln!("{}", e);
+                            process::exit(1);
+                        }
+                    };
+                    let mut properties = HashMap::<&str, &str>::new();
+                    for i in 0..record.len() {
+                        let header = headers.get(i).unwrap();
+                        let value = record.get(i).unwrap();
+                        properties.insert(header, value);
+                    }
+                    match client.add_item_to_database(&args.id, properties).await {
+                        Ok(()) => (),
+                        Err(e) => {
+                            eprintln!(
+                                "error has occured during creating new database item in a record of csv."
+                            );
+                            eprintln!("{}", e);
+                            process::exit(1);
+                        }
+                    };
+                }
             }
         }
     }

@@ -1,9 +1,9 @@
 use notion_client::{
     NotionClientError,
-    endpoints::{Client, search::title},
+    endpoints::{Client, databases::create, search::title},
     objects::database,
 };
-use std::process;
+use std::{collections::HashMap, process};
 
 pub struct NotionClient {
     client: Client,
@@ -58,6 +58,24 @@ impl NotionClient {
             Err(e) => return Err(e),
             Ok(database) => return Ok(database),
         }
+    }
+
+    pub async fn add_item_to_database(
+        &self,
+        database_id: &str,
+        properties: HashMap<&str, &str>,
+    ) -> Result<(), NotionClientError> {
+        Ok(())
+        // TODO: set up properties
+        // let properties =
+        // let request = create::request::CreateADatabaseRequest {
+        //     parent: notion_client::objects::parent::Parent::DatabaseId {
+        //         database_id: database_id.to_string(),
+        //     },
+        //     properties: properties,
+        //     ..Default::default()
+        // };
+        // self.client.databases.create_a_database(request);
     }
 }
 
