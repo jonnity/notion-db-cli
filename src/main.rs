@@ -4,6 +4,7 @@ mod operations;
 use clap::Parser;
 use commands::{CliArgs, Commands};
 use operations::{NotionClient, database_to_properties_info};
+use reqwest::header;
 use std::{fs::File, process};
 
 #[tokio::main]
@@ -88,14 +89,38 @@ async fn main() {
                 println!("{}", json)
             } else if let Some(path) = &args.item.file {
                 let file = File::open(path).unwrap();
-                let mut rdr = csv::ReaderBuilder::new()
+                let mut reader = csv::ReaderBuilder::new()
                     .has_headers(true)
                     .trim(csv::Trim::All)
                     .from_reader(file);
-                for result in rdr.records() {
-                    let record = result.unwrap();
-                    println!("{:?}", record);
+                let headers = match reader.headers() {
+                    Ok(headers) => headers,
+                    Err(e) => {
+                        eprintln!("fail to read headers from csv.");
+                        eprintln!("{}", e);
+                        process::exit(1);
+                    }
+                };
+
+                let target_db = match client.view_database(&args.id).await {
+                    Ok(target_db) => target_db,
+                    Err(e) => {
+                        eprintln!("fail to retrieve the databases information.");
+                        eprintln!("{}", e);
+                        process::exit(1);
+                    }
+                };
+
+                if headers.len().ne(&target_db.properties.len()) {
+                    eprintln!("the lengths of keys in Notion DB and in csv header differ.");
+                    process::exit(1);
                 }
+                target_db.properties.iter().for_each(|(key, _property)| {
+                    let csv_has_key = headers.iter().any(|header| header.eq(key));
+                    if !csv_has_key {
+                        eprintln!("the key {} is missing in the csv.", key);
+                    }
+                });
             }
         }
     }
