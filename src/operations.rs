@@ -1,9 +1,15 @@
 use notion_client::{
     NotionClientError,
-    endpoints::{Client, databases::create, search::title},
-    objects::database,
+    endpoints::{Client, pages::create, search::title},
+    objects::{
+        database::{self, DatabaseProperty},
+        page::PageProperty,
+    },
 };
-use std::{collections::HashMap, process};
+use std::{
+    collections::{BTreeMap, HashMap},
+    process,
+};
 
 pub struct NotionClient {
     client: Client,
@@ -65,17 +71,54 @@ impl NotionClient {
         database_id: &str,
         properties: HashMap<&str, &str>,
     ) -> Result<(), NotionClientError> {
-        Ok(())
-        // TODO: set up properties
-        // let properties =
-        // let request = create::request::CreateADatabaseRequest {
-        //     parent: notion_client::objects::parent::Parent::DatabaseId {
-        //         database_id: database_id.to_string(),
-        //     },
-        //     properties: properties,
-        //     ..Default::default()
-        // };
-        // self.client.databases.create_a_database(request);
+        let target_db = match self.view_database(database_id).await {
+            Ok(database) => database,
+            Err(e) => return Err(e),
+        };
+
+        if properties.len().ne(&target_db.properties.len()) {
+            eprintln!("the lengths of keys in Notion DB and in csv header differ.");
+            process::exit(1);
+        }
+
+        let mut parsed_properties = BTreeMap::<String, PageProperty>::new();
+        for (key, property) in target_db.properties {
+            let input_value = *properties.get(&key as &str).unwrap();
+            match property {
+                DatabaseProperty::Checkbox { .. } => {
+                    let input_value: bool = match input_value.parse() {
+                        Ok(b) => b,
+                        Err(e) => {
+                            eprintln!(
+                                "{} cannot be parsed as an input for {}. Please enter \"true\" or \"false\" as a Checkbox property.",
+                                input_value, key
+                            );
+                            eprintln!("{}", e);
+                            process::exit(1);
+                        }
+                    };
+                    parsed_properties.insert(
+                        key,
+                        PageProperty::Checkbox {
+                            id: None,
+                            checkbox: input_value,
+                        },
+                    );
+                }
+                _ => {}
+            }
+        }
+        let request = create::request::CreateAPageRequest {
+            parent: notion_client::objects::parent::Parent::DatabaseId {
+                database_id: database_id.to_string(),
+            },
+            properties: parsed_properties,
+            ..Default::default()
+        };
+        match self.client.pages.create_a_page(request).await {
+            Ok(_db) => Ok(()),
+            Err(e) => Err(e),
+        }
     }
 }
 

@@ -101,26 +101,6 @@ async fn main() {
                     }
                 };
 
-                let target_db = match client.view_database(&args.id).await {
-                    Ok(target_db) => target_db,
-                    Err(e) => {
-                        eprintln!("fail to retrieve the databases information.");
-                        eprintln!("{}", e);
-                        process::exit(1);
-                    }
-                };
-
-                if headers.len().ne(&target_db.properties.len()) {
-                    eprintln!("the lengths of keys in Notion DB and in csv header differ.");
-                    process::exit(1);
-                }
-                target_db.properties.iter().for_each(|(key, _property)| {
-                    let csv_has_key = headers.iter().any(|header| header.eq(key));
-                    if !csv_has_key {
-                        eprintln!("the key {} is missing in the csv.", key);
-                    }
-                });
-
                 for record in reader.records() {
                     let record = match record {
                         Ok(record) => record,
