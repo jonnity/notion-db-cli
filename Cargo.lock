@@ -1036,6 +1036,7 @@ dependencies = [
  "notion-client",
  "reqwest 0.12.15",
  "tokio",
+ "url",
 ]
 
 [[package]]

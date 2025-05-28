@@ -3,9 +3,11 @@ use notion_client::{
     endpoints::{Client, pages::create, search::title},
     objects::{
         database::{self, DatabaseProperty},
-        page::PageProperty,
+        page::{PageProperty, SelectPropertyValue},
     },
 };
+use url;
+
 use std::{
     collections::{BTreeMap, HashMap},
     process,
@@ -102,6 +104,53 @@ impl NotionClient {
                         PageProperty::Checkbox {
                             id: None,
                             checkbox: input_value,
+                        },
+                    );
+                }
+                DatabaseProperty::Url { .. } => {
+                    let input_value = match url::Url::parse(input_value) {
+                        Ok(b) => b,
+                        Err(e) => {
+                            eprintln!(
+                                "{} cannot be parsed as an input for {}. Please enter proper URL as a Url property.",
+                                input_value, key
+                            );
+                            eprintln!("{}", e);
+                            process::exit(1);
+                        }
+                    };
+                    parsed_properties.insert(
+                        key,
+                        PageProperty::Url {
+                            id: None,
+                            url: Some(input_value.to_string()),
+                        },
+                    );
+                }
+                DatabaseProperty::MultiSelect { multi_select, .. } => {
+                    let options: Vec<String> = multi_select
+                        .options
+                        .iter()
+                        .map(|option| option.name.clone())
+                        .collect();
+                    if !options.iter().any(|option| option.eq(input_value)) {
+                        eprintln!(
+                            "{} cannot be used as an input for {}. Please select from following options: {}",
+                            input_value,
+                            key,
+                            options.join(" / ")
+                        );
+                        process::exit(1);
+                    }
+                    parsed_properties.insert(
+                        key,
+                        PageProperty::MultiSelect {
+                            id: None,
+                            multi_select: vec![SelectPropertyValue {
+                                name: Some(input_value.to_string()),
+                                color: None,
+                                id: None,
+                            }],
                         },
                     );
                 }
