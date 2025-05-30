@@ -298,6 +298,11 @@ pub fn database_to_properties_info(database: &database::Database) -> Vec<Propert
                 r#type: "Url",
                 example: "https://jonnity.com".to_string(),
             },
+            DatabaseProperty::Button { .. } => PropertyInfo {
+                name: name.clone(),
+                r#type: "Button",
+                example: "-".to_string(),
+            },
         })
         .collect()
 }
