@@ -963,6 +963,7 @@ dependencies = [
  "email-address-parser",
  "notion-client",
  "regex",
+ "serde_json",
  "tokio",
  "url",
 ]

@@ -9,6 +9,7 @@ use notion_client::{
     },
 };
 use regex::Regex;
+use serde_json::Number;
 use url;
 
 use std::{
@@ -223,7 +224,22 @@ impl NotionClient {
                         },
                     );
                 }
-                DatabaseProperty::Number { .. } => todo!(),
+                DatabaseProperty::Number { .. } => match input_value.parse::<Number>() {
+                    Ok(number) => {
+                        parsed_properties.insert(
+                            key,
+                            PageProperty::Number {
+                                id: None,
+                                number: Some(number),
+                            },
+                        );
+                    }
+                    Err(e) => {
+                        eprintln!("fail to parse number.");
+                        eprintln!("{}", e);
+                        process::exit(1);
+                    }
+                },
                 DatabaseProperty::PhoneNumber { .. } => todo!(),
                 DatabaseProperty::Select { select, .. } => todo!(),
                 DatabaseProperty::Status { status, .. } => todo!(),
