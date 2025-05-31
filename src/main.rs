@@ -83,53 +83,45 @@ async fn main() {
             }
         }
         Commands::DbAdd(args) => {
-            println!(
-                "the bellow item will be added to the database whose id is {} here",
-                args.id
-            );
-            if let Some(json) = &args.item.json {
-                println!("{}", json)
-            } else if let Some(path) = &args.item.file {
-                let file = File::open(path).unwrap();
-                let mut reader = csv::ReaderBuilder::new()
-                    .has_headers(true)
-                    .trim(csv::Trim::All)
-                    .from_reader(file);
-                let headers = match reader.headers() {
-                    Ok(headers) => headers.clone(),
+            let file = File::open(&args.file).unwrap();
+            let mut reader = csv::ReaderBuilder::new()
+                .has_headers(true)
+                .trim(csv::Trim::All)
+                .from_reader(file);
+            let headers = match reader.headers() {
+                Ok(headers) => headers.clone(),
+                Err(e) => {
+                    eprintln!("fail to read headers from csv.");
+                    eprintln!("{}", e);
+                    process::exit(1);
+                }
+            };
+
+            for record in reader.records() {
+                let record = match record {
+                    Ok(record) => record,
                     Err(e) => {
-                        eprintln!("fail to read headers from csv.");
+                        eprintln!("fail to read a record in csv.");
                         eprintln!("{}", e);
                         process::exit(1);
                     }
                 };
-
-                for record in reader.records() {
-                    let record = match record {
-                        Ok(record) => record,
-                        Err(e) => {
-                            eprintln!("fail to read a record in csv.");
-                            eprintln!("{}", e);
-                            process::exit(1);
-                        }
-                    };
-                    let mut properties = HashMap::<&str, &str>::new();
-                    for i in 0..record.len() {
-                        let header = headers.get(i).unwrap();
-                        let value = record.get(i).unwrap();
-                        properties.insert(header, value);
-                    }
-                    match client.add_item_to_database(&args.id, properties).await {
-                        Ok(()) => (),
-                        Err(e) => {
-                            eprintln!(
-                                "error has occured during creating new database item in a record of csv."
-                            );
-                            eprintln!("{}", e);
-                            process::exit(1);
-                        }
-                    };
+                let mut properties = HashMap::<&str, &str>::new();
+                for i in 0..record.len() {
+                    let header = headers.get(i).unwrap();
+                    let value = record.get(i).unwrap();
+                    properties.insert(header, value);
                 }
+                match client.add_item_to_database(&args.id, properties).await {
+                    Ok(()) => (),
+                    Err(e) => {
+                        eprintln!(
+                            "error has occured during creating new database item in a record of csv."
+                        );
+                        eprintln!("{}", e);
+                        process::exit(1);
+                    }
+                };
             }
         }
     }

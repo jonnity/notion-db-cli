@@ -34,17 +34,6 @@ pub struct DbViewArgs {
 pub struct DbAddArgs {
     /// Target database id
     pub id: String,
-    #[clap(flatten)]
-    pub item: DbItemGroup,
-}
-
-#[derive(Debug, Args)]
-#[group(required = true, multiple = false)]
-pub struct DbItemGroup {
-    /// specify the item to add with json string
-    #[clap(long)]
-    pub json: Option<String>,
-    /// specify the item to add with the file contents
-    #[clap(long)]
-    pub file: Option<String>,
+    #[clap(long, short)]
+    pub file: String,
 }
