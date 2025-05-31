@@ -1,11 +1,13 @@
+use chrono::DateTime;
 use notion_client::{
     NotionClientError,
     endpoints::{Client, pages::create, search::title},
     objects::{
         database::{self, DatabaseProperty},
-        page::{PageProperty, SelectPropertyValue},
+        page::{DatePropertyValue, PageProperty, SelectPropertyValue},
     },
 };
+use regex::Regex;
 use url;
 
 use std::{
@@ -127,6 +129,72 @@ impl NotionClient {
                         },
                     );
                 }
+                DatabaseProperty::Date { .. } => {
+                    let dates_regex = Regex::new(r"from\s+(\S+)\s+to\s+(\S+)").unwrap();
+                    let date_property = if dates_regex.is_match(input_value) {
+                        let (start_date, end_date) = dates_regex
+                            .captures(input_value)
+                            .map(|caps| {
+                                let start_date = match DateTime::parse_from_rfc3339(&caps[1])
+                                    .or_else(|_| DateTime::parse_from_rfc2822(&caps[1]))
+                                {
+                                    Ok(date) => date,
+                                    Err(e) => {
+                                        eprintln!("fail to parse the start date string.");
+                                        eprintln!("{}", e);
+                                        process::exit(1);
+                                    }
+                                };
+                                let end_date = match DateTime::parse_from_rfc3339(&caps[2])
+                                    .or_else(|_| DateTime::parse_from_rfc2822(&caps[2]))
+                                {
+                                    Ok(date) => date,
+                                    Err(e) => {
+                                        eprintln!("fail to parse the end date string.");
+                                        eprintln!("{}", e);
+                                        process::exit(1);
+                                    }
+                                };
+                                (start_date, end_date)
+                            })
+                            .unwrap();
+                        DatePropertyValue {
+                            start: Some(notion_client::objects::page::DateOrDateTime::DateTime(
+                                start_date.to_utc(),
+                            )),
+                            end: Some(notion_client::objects::page::DateOrDateTime::DateTime(
+                                end_date.to_utc(),
+                            )),
+                            time_zone: None,
+                        }
+                    } else {
+                        let date = DateTime::parse_from_rfc3339(input_value)
+                            .or_else(|_| DateTime::parse_from_rfc2822(input_value));
+                        let date = match date {
+                            Ok(date) => date,
+                            Err(e) => {
+                                eprintln!("fail to parse the date string.");
+                                eprintln!("{}", e);
+                                process::exit(1);
+                            }
+                        };
+                        DatePropertyValue {
+                            start: Some(notion_client::objects::page::DateOrDateTime::DateTime(
+                                date.to_utc(),
+                            )),
+                            end: None,
+                            time_zone: None,
+                        }
+                    };
+
+                    parsed_properties.insert(
+                        key,
+                        PageProperty::Date {
+                            id: None,
+                            date: Some(date_property),
+                        },
+                    );
+                }
                 DatabaseProperty::MultiSelect { multi_select, .. } => {
                     let options: Vec<String> = multi_select
                         .options
@@ -209,7 +277,7 @@ pub fn get_example_for_database_property(database_property: &DatabaseProperty) -
             .map(|group| group.name.clone())
             .collect::<Vec<String>>()
             .join("/"),
-        DatabaseProperty::Title { .. } => "-".to_string(),
+        DatabaseProperty::Title { .. } => "Title".to_string(),
         DatabaseProperty::Url { .. } => "https://jonnity.com".to_string(),
         DatabaseProperty::Button { .. } => "-".to_string(),
     }
