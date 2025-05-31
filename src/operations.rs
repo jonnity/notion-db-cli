@@ -109,26 +109,6 @@ impl NotionClient {
                         },
                     );
                 }
-                DatabaseProperty::Url { .. } => {
-                    let input_value = match url::Url::parse(input_value) {
-                        Ok(b) => b,
-                        Err(e) => {
-                            eprintln!(
-                                "{} cannot be parsed as an input for {}. Please enter proper URL as a Url property.",
-                                input_value, key
-                            );
-                            eprintln!("{}", e);
-                            process::exit(1);
-                        }
-                    };
-                    parsed_properties.insert(
-                        key,
-                        PageProperty::Url {
-                            id: None,
-                            url: Some(input_value.to_string()),
-                        },
-                    );
-                }
                 DatabaseProperty::Date { .. } => {
                     let dates_regex = Regex::new(r"from\s+(\S+)\s+to\s+(\S+)").unwrap();
                     let date_property = if dates_regex.is_match(input_value) {
@@ -195,6 +175,7 @@ impl NotionClient {
                         },
                     );
                 }
+                DatabaseProperty::Email { .. } => todo!(),
                 DatabaseProperty::MultiSelect { multi_select, .. } => {
                     let options: Vec<String> = multi_select
                         .options
@@ -219,6 +200,31 @@ impl NotionClient {
                                 color: None,
                                 id: None,
                             }],
+                        },
+                    );
+                }
+                DatabaseProperty::Number { .. } => todo!(),
+                DatabaseProperty::PhoneNumber { .. } => todo!(),
+                DatabaseProperty::Select { select, .. } => todo!(),
+                DatabaseProperty::Status { status, .. } => todo!(),
+                DatabaseProperty::Title { .. } => todo!(),
+                DatabaseProperty::Url { .. } => {
+                    let input_value = match url::Url::parse(input_value) {
+                        Ok(b) => b,
+                        Err(e) => {
+                            eprintln!(
+                                "{} cannot be parsed as an input for {}. Please enter proper URL as a Url property.",
+                                input_value, key
+                            );
+                            eprintln!("{}", e);
+                            process::exit(1);
+                        }
+                    };
+                    parsed_properties.insert(
+                        key,
+                        PageProperty::Url {
+                            id: None,
+                            url: Some(input_value.to_string()),
                         },
                     );
                 }
