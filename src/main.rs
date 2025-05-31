@@ -3,7 +3,7 @@ mod operations;
 
 use clap::Parser;
 use commands::{CliArgs, Commands};
-use operations::{NotionClient, database_to_properties_info};
+use operations::{NotionClient, get_example_for_database_property, propery_to_string};
 use std::{collections::HashMap, fs::File, process};
 
 #[tokio::main]
@@ -40,12 +40,15 @@ async fn main() {
                     process::exit(1);
                 }
                 Ok(database) => {
-                    let properties = database_to_properties_info(&database); // TODO: improve the text
                     if let Some(file_path) = &args.file {
-                        let property_keys: Vec<String> =
-                            properties.iter().map(|p| p.name.clone()).collect();
-                        let property_examples: Vec<String> =
-                            properties.iter().map(|p| p.example.clone()).collect();
+                        let (property_keys, property_examples): (Vec<String>, Vec<String>) =
+                            database
+                                .properties
+                                .iter()
+                                .map(|(name, property)| {
+                                    (name.clone(), get_example_for_database_property(property))
+                                })
+                                .collect();
                         let property_keys_csv = property_keys.join(", ");
                         let property_example_csv = property_examples.join(", ");
                         let content = format!("{}\n{}", property_keys_csv, property_example_csv);
@@ -60,16 +63,16 @@ async fn main() {
                         println!("the structure and columns of the database are as follows:");
                         let mut property_keys_row = "|".to_string();
                         let mut property_type_row = "|".to_string();
-                        properties.iter().for_each(|property| {
-                            let name_len = property.name.chars().count();
-                            let type_len = property.r#type.chars().count();
+                        database.properties.iter().for_each(|(name, property)| {
+                            let property = propery_to_string(property);
+
+                            let name_len = name.chars().count();
+                            let type_len = property.chars().count();
                             let max_len = name_len.max(type_len);
                             let pudded_key =
-                                format!(" {:<width$} |", property.name, width = max_len)
-                                    .to_string();
+                                format!(" {:<width$} |", name, width = max_len).to_string();
                             let pudded_type =
-                                format!(" {:<width$} |", property.r#type, width = max_len)
-                                    .to_string();
+                                format!(" {:<width$} |", property, width = max_len).to_string();
                             property_keys_row += &pudded_key;
                             property_type_row += &pudded_type;
                         });
