@@ -240,7 +240,15 @@ impl NotionClient {
                         process::exit(1);
                     }
                 },
-                DatabaseProperty::PhoneNumber { .. } => todo!(),
+                DatabaseProperty::PhoneNumber { .. } => {
+                    parsed_properties.insert(
+                        key,
+                        PageProperty::PhoneNumber {
+                            id: None,
+                            phone_number: Some(input_value.to_string()),
+                        },
+                    );
+                }
                 DatabaseProperty::Select { select, .. } => todo!(),
                 DatabaseProperty::Status { status, .. } => todo!(),
                 DatabaseProperty::Title { .. } => todo!(),
