@@ -6,6 +6,7 @@ use notion_client::{
     objects::{
         database::{self, DatabaseProperty},
         page::{DatePropertyValue, PageProperty, SelectPropertyValue},
+        rich_text::{RichText, Text},
     },
 };
 use regex::Regex;
@@ -289,11 +290,27 @@ impl NotionClient {
                             },
                         );
                     } else {
-                        eprintln!("invalid option for select property.");
+                        eprintln!("invalid option for status property.");
                         process::exit(1);
                     }
                 }
-                DatabaseProperty::Title { .. } => todo!(),
+                DatabaseProperty::Title { .. } => {
+                    parsed_properties.insert(
+                        key,
+                        PageProperty::Title {
+                            id: None,
+                            title: vec![RichText::Text {
+                                text: Text {
+                                    content: input_value.to_string(),
+                                    link: None,
+                                },
+                                annotations: None,
+                                plain_text: Some(input_value.to_string()),
+                                href: None,
+                            }],
+                        },
+                    );
+                }
                 DatabaseProperty::Url { .. } => {
                     let input_value = match url::Url::parse(input_value) {
                         Ok(b) => b,
