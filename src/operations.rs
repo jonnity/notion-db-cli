@@ -250,6 +250,23 @@ impl NotionClient {
                         },
                     );
                 }
+                DatabaseProperty::RichText { .. } => {
+                    parsed_properties.insert(
+                        key,
+                        PageProperty::RichText {
+                            id: None,
+                            rich_text: vec![RichText::Text {
+                                text: Text {
+                                    content: input_value.to_string(),
+                                    link: None,
+                                },
+                                annotations: None,
+                                plain_text: Some(input_value.to_string()),
+                                href: None,
+                            }],
+                        },
+                    );
+                }
                 DatabaseProperty::Select { select, .. } => {
                     if select
                         .options
@@ -372,7 +389,7 @@ pub fn get_example_for_database_property(database_property: &DatabaseProperty) -
         DatabaseProperty::People { .. } => "-".to_string(),
         DatabaseProperty::PhoneNumber { .. } => "123-456-7890".to_string(),
         DatabaseProperty::Relation { .. } => "-".to_string(),
-        DatabaseProperty::RichText { .. } => "-".to_string(),
+        DatabaseProperty::RichText { .. } => "only plain text is supported".to_string(),
         DatabaseProperty::Rollup { .. } => "-".to_string(),
         DatabaseProperty::Select { select, .. } => select
             .options
