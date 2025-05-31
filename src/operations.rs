@@ -1,9 +1,22 @@
+use chrono::DateTime;
+use email_address_parser::EmailAddress;
 use notion_client::{
     NotionClientError,
-    endpoints::{Client, search::title},
-    objects::database,
+    endpoints::{Client, pages::create, search::title},
+    objects::{
+        database::{self, DatabaseProperty},
+        page::{DatePropertyValue, PageProperty, SelectPropertyValue},
+        rich_text::{RichText, Text},
+    },
 };
-use std::process;
+use regex::Regex;
+use serde_json::Number;
+use url;
+
+use std::{
+    collections::{BTreeMap, HashMap},
+    process,
+};
 
 pub struct NotionClient {
     client: Client,
@@ -59,135 +72,365 @@ impl NotionClient {
             Ok(database) => return Ok(database),
         }
     }
+
+    pub async fn add_item_to_database(
+        &self,
+        database_id: &str,
+        properties: HashMap<&str, &str>,
+    ) -> Result<(), NotionClientError> {
+        let target_db = match self.view_database(database_id).await {
+            Ok(database) => database,
+            Err(e) => return Err(e),
+        };
+
+        if properties.len().ne(&target_db.properties.len()) {
+            eprintln!("the lengths of keys in Notion DB and in csv header differ.");
+            process::exit(1);
+        }
+
+        let mut parsed_properties = BTreeMap::<String, PageProperty>::new();
+        for (key, property) in target_db.properties {
+            let input_value = *properties.get(&key as &str).unwrap();
+            match property {
+                DatabaseProperty::Checkbox { .. } => {
+                    let input_value: bool = match input_value.parse() {
+                        Ok(b) => b,
+                        Err(e) => {
+                            eprintln!(
+                                "{} cannot be parsed as an input for {}. Please enter \"true\" or \"false\" as a Checkbox property.",
+                                input_value, key
+                            );
+                            eprintln!("{}", e);
+                            process::exit(1);
+                        }
+                    };
+                    parsed_properties.insert(
+                        key,
+                        PageProperty::Checkbox {
+                            id: None,
+                            checkbox: input_value,
+                        },
+                    );
+                }
+                DatabaseProperty::Date { .. } => {
+                    let dates_regex = Regex::new(r"from\s+(\S+)\s+to\s+(\S+)").unwrap();
+                    let date_property = if dates_regex.is_match(input_value) {
+                        let (start_date, end_date) = dates_regex
+                            .captures(input_value)
+                            .map(|caps| {
+                                let start_date = match DateTime::parse_from_rfc3339(&caps[1])
+                                    .or_else(|_| DateTime::parse_from_rfc2822(&caps[1]))
+                                {
+                                    Ok(date) => date,
+                                    Err(e) => {
+                                        eprintln!("fail to parse the start date string.");
+                                        eprintln!("{}", e);
+                                        process::exit(1);
+                                    }
+                                };
+                                let end_date = match DateTime::parse_from_rfc3339(&caps[2])
+                                    .or_else(|_| DateTime::parse_from_rfc2822(&caps[2]))
+                                {
+                                    Ok(date) => date,
+                                    Err(e) => {
+                                        eprintln!("fail to parse the end date string.");
+                                        eprintln!("{}", e);
+                                        process::exit(1);
+                                    }
+                                };
+                                (start_date, end_date)
+                            })
+                            .unwrap();
+                        DatePropertyValue {
+                            start: Some(notion_client::objects::page::DateOrDateTime::DateTime(
+                                start_date.to_utc(),
+                            )),
+                            end: Some(notion_client::objects::page::DateOrDateTime::DateTime(
+                                end_date.to_utc(),
+                            )),
+                            time_zone: None,
+                        }
+                    } else {
+                        let date = DateTime::parse_from_rfc3339(input_value)
+                            .or_else(|_| DateTime::parse_from_rfc2822(input_value));
+                        let date = match date {
+                            Ok(date) => date,
+                            Err(e) => {
+                                eprintln!("fail to parse the date string.");
+                                eprintln!("{}", e);
+                                process::exit(1);
+                            }
+                        };
+                        DatePropertyValue {
+                            start: Some(notion_client::objects::page::DateOrDateTime::DateTime(
+                                date.to_utc(),
+                            )),
+                            end: None,
+                            time_zone: None,
+                        }
+                    };
+
+                    parsed_properties.insert(
+                        key,
+                        PageProperty::Date {
+                            id: None,
+                            date: Some(date_property),
+                        },
+                    );
+                }
+                DatabaseProperty::Email { .. } => {
+                    match EmailAddress::parse(
+                        input_value,
+                        Some(email_address_parser::ParsingOptions { is_lax: true }),
+                    ) {
+                        Some(email) => {
+                            parsed_properties.insert(
+                                key,
+                                PageProperty::Email {
+                                    id: None,
+                                    email: Some(email.to_string()),
+                                },
+                            );
+                        }
+                        None => {
+                            eprintln!("fail to parse the email address.");
+                            process::exit(1);
+                        }
+                    };
+                }
+                DatabaseProperty::MultiSelect { multi_select, .. } => {
+                    let options: Vec<String> = multi_select
+                        .options
+                        .iter()
+                        .map(|option| option.name.clone())
+                        .collect();
+                    if !options.iter().any(|option| option.eq(input_value)) {
+                        eprintln!(
+                            "{} cannot be used as an input for {}. Please select from following options: {}",
+                            input_value,
+                            key,
+                            options.join(" / ")
+                        );
+                        process::exit(1);
+                    }
+                    parsed_properties.insert(
+                        key,
+                        PageProperty::MultiSelect {
+                            id: None,
+                            multi_select: vec![SelectPropertyValue {
+                                name: Some(input_value.to_string()),
+                                color: None,
+                                id: None,
+                            }],
+                        },
+                    );
+                }
+                DatabaseProperty::Number { .. } => match input_value.parse::<Number>() {
+                    Ok(number) => {
+                        parsed_properties.insert(
+                            key,
+                            PageProperty::Number {
+                                id: None,
+                                number: Some(number),
+                            },
+                        );
+                    }
+                    Err(e) => {
+                        eprintln!("fail to parse number.");
+                        eprintln!("{}", e);
+                        process::exit(1);
+                    }
+                },
+                DatabaseProperty::PhoneNumber { .. } => {
+                    parsed_properties.insert(
+                        key,
+                        PageProperty::PhoneNumber {
+                            id: None,
+                            phone_number: Some(input_value.to_string()),
+                        },
+                    );
+                }
+                DatabaseProperty::RichText { .. } => {
+                    parsed_properties.insert(
+                        key,
+                        PageProperty::RichText {
+                            id: None,
+                            rich_text: vec![RichText::Text {
+                                text: Text {
+                                    content: input_value.to_string(),
+                                    link: None,
+                                },
+                                annotations: None,
+                                plain_text: Some(input_value.to_string()),
+                                href: None,
+                            }],
+                        },
+                    );
+                }
+                DatabaseProperty::Select { select, .. } => {
+                    if select
+                        .options
+                        .iter()
+                        .any(|option| option.name.eq(input_value))
+                    {
+                        parsed_properties.insert(
+                            key,
+                            PageProperty::Select {
+                                id: None,
+                                select: Some(SelectPropertyValue {
+                                    id: None,
+                                    name: Some(input_value.to_string()),
+                                    color: None,
+                                }),
+                            },
+                        );
+                    } else {
+                        eprintln!("invalid option for select property.");
+                        process::exit(1);
+                    }
+                }
+                DatabaseProperty::Status { status, .. } => {
+                    if status
+                        .options
+                        .iter()
+                        .any(|option| option.name.eq(input_value))
+                    {
+                        parsed_properties.insert(
+                            key,
+                            PageProperty::Status {
+                                id: None,
+                                status: Some(SelectPropertyValue {
+                                    id: None,
+                                    name: Some(input_value.to_string()),
+                                    color: None,
+                                }),
+                            },
+                        );
+                    } else {
+                        eprintln!("invalid option for status property.");
+                        process::exit(1);
+                    }
+                }
+                DatabaseProperty::Title { .. } => {
+                    parsed_properties.insert(
+                        key,
+                        PageProperty::Title {
+                            id: None,
+                            title: vec![RichText::Text {
+                                text: Text {
+                                    content: input_value.to_string(),
+                                    link: None,
+                                },
+                                annotations: None,
+                                plain_text: Some(input_value.to_string()),
+                                href: None,
+                            }],
+                        },
+                    );
+                }
+                DatabaseProperty::Url { .. } => {
+                    let input_value = match url::Url::parse(input_value) {
+                        Ok(b) => b,
+                        Err(e) => {
+                            eprintln!(
+                                "{} cannot be parsed as an input for {}. Please enter proper URL as a Url property.",
+                                input_value, key
+                            );
+                            eprintln!("{}", e);
+                            process::exit(1);
+                        }
+                    };
+                    parsed_properties.insert(
+                        key,
+                        PageProperty::Url {
+                            id: None,
+                            url: Some(input_value.to_string()),
+                        },
+                    );
+                }
+                _ => {}
+            }
+        }
+        let request = create::request::CreateAPageRequest {
+            parent: notion_client::objects::parent::Parent::DatabaseId {
+                database_id: database_id.to_string(),
+            },
+            properties: parsed_properties,
+            ..Default::default()
+        };
+        match self.client.pages.create_a_page(request).await {
+            Ok(_db) => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
 }
 
-pub struct PropertyInfo {
-    pub name: String,
-    pub r#type: &'static str,
-    pub example: String,
+pub fn get_example_for_database_property(database_property: &DatabaseProperty) -> String {
+    match database_property {
+        DatabaseProperty::Checkbox { .. } => "true/false".to_string(),
+        DatabaseProperty::CreatedBy { .. } => "-".to_string(),
+        DatabaseProperty::CreatedTime { .. } => "-".to_string(),
+        DatabaseProperty::Date { .. } => {
+            return "2020-12-07T12:00:00Z/from 2020-12-08T12:00:00Z to 2020-12-09T12:00:00Z"
+                .to_string();
+        }
+        DatabaseProperty::Email { .. } => "foo@example.com".to_string(),
+        DatabaseProperty::Files { .. } => "-".to_string(),
+        DatabaseProperty::Formula { .. } => "-".to_string(),
+        DatabaseProperty::LastEditedBy { .. } => "-".to_string(),
+        DatabaseProperty::LastEditedTime { .. } => "-".to_string(),
+        DatabaseProperty::MultiSelect { multi_select, .. } => multi_select
+            .options
+            .iter()
+            .map(|option_value| option_value.name.clone())
+            .collect::<Vec<String>>()
+            .join("/"),
+        DatabaseProperty::Number { .. } => "123".to_string(),
+        DatabaseProperty::People { .. } => "-".to_string(),
+        DatabaseProperty::PhoneNumber { .. } => "123-456-7890".to_string(),
+        DatabaseProperty::Relation { .. } => "-".to_string(),
+        DatabaseProperty::RichText { .. } => "only plain text is supported".to_string(),
+        DatabaseProperty::Rollup { .. } => "-".to_string(),
+        DatabaseProperty::Select { select, .. } => select
+            .options
+            .iter()
+            .map(|option_value| option_value.name.clone())
+            .collect::<Vec<String>>()
+            .join("/"),
+        DatabaseProperty::Status { status, .. } => status
+            .groups
+            .iter()
+            .map(|group| group.name.clone())
+            .collect::<Vec<String>>()
+            .join("/"),
+        DatabaseProperty::Title { .. } => "Title".to_string(),
+        DatabaseProperty::Url { .. } => "https://example.com".to_string(),
+        DatabaseProperty::Button { .. } => "-".to_string(),
+    }
 }
 
-pub fn database_to_properties_info(database: &database::Database) -> Vec<PropertyInfo> {
-    database
-        .properties
-        .iter()
-        .map(|(name, property)| match property {
-            database::DatabaseProperty::Checkbox { .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "Checkbox",
-                example: "true/false".to_string(),
-            },
-            database::DatabaseProperty::CreatedBy { .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "CreatedBy",
-                example: "-".to_string(),
-            },
-            database::DatabaseProperty::CreatedTime { .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "CreatedTime",
-                example: "-".to_string(),
-            },
-            database::DatabaseProperty::Date { .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "Date",
-                example: "2020-12-07T12:00:00Z/from 2020-12-08T12:00:00Z to 2020-12-09T12:00:00Z"
-                    .to_string(),
-            },
-            database::DatabaseProperty::Email { .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "Email",
-                example: "foo@example.com".to_string(),
-            },
-            database::DatabaseProperty::Files { .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "Files",
-                example: "-".to_string(),
-            },
-            database::DatabaseProperty::Formula { .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "Formula",
-                example: "-".to_string(),
-            },
-            database::DatabaseProperty::LastEditedBy { .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "LastEditedBy",
-                example: "-".to_string(),
-            },
-            database::DatabaseProperty::LastEditedTime { .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "LastEditedTime",
-                example: "-".to_string(),
-            },
-            database::DatabaseProperty::MultiSelect { multi_select, .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "MultiSelect",
-                example: multi_select
-                    .options
-                    .iter()
-                    .map(|option_value| option_value.name.clone())
-                    .collect::<Vec<String>>()
-                    .join("/"),
-            },
-            database::DatabaseProperty::Number { .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "Number",
-                example: "123".to_string(),
-            },
-            database::DatabaseProperty::People { .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "People",
-                example: "-".to_string(),
-            },
-            database::DatabaseProperty::PhoneNumber { .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "PhoneNumber",
-                example: "123-456-7890".to_string(),
-            },
-            database::DatabaseProperty::Relation { .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "Relation",
-                example: "-".to_string(),
-            },
-            database::DatabaseProperty::RichText { .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "RichText",
-                example: "-".to_string(),
-            },
-            database::DatabaseProperty::Rollup { .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "Rollup",
-                example: "-".to_string(),
-            },
-            database::DatabaseProperty::Select { select, .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "Select",
-                example: select
-                    .options
-                    .iter()
-                    .map(|option_value| option_value.name.clone())
-                    .collect::<Vec<String>>()
-                    .join("/"),
-            },
-            database::DatabaseProperty::Status { status, .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "Status",
-                example: status
-                    .groups
-                    .iter()
-                    .map(|group| group.name.clone())
-                    .collect::<Vec<String>>()
-                    .join("/"),
-            },
-            database::DatabaseProperty::Title { .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "Title",
-                example: "-".to_string(),
-            },
-            database::DatabaseProperty::Url { .. } => PropertyInfo {
-                name: name.clone(),
-                r#type: "Url",
-                example: "https://jonnity.com".to_string(),
-            },
-        })
-        .collect()
+pub fn propery_to_string(database_property: &DatabaseProperty) -> &str {
+    match database_property {
+        DatabaseProperty::Checkbox { .. } => "Checkbox",
+        DatabaseProperty::CreatedBy { .. } => "CreatedBy",
+        DatabaseProperty::CreatedTime { .. } => "CreatedTime",
+        DatabaseProperty::Date { .. } => "Date",
+        DatabaseProperty::Email { .. } => "Email",
+        DatabaseProperty::Files { .. } => "Files",
+        DatabaseProperty::Formula { .. } => "Formula",
+        DatabaseProperty::LastEditedBy { .. } => "LastEditedBy",
+        DatabaseProperty::LastEditedTime { .. } => "LastEditedTime",
+        DatabaseProperty::MultiSelect { .. } => "MultiSelect",
+        DatabaseProperty::Number { .. } => "Number",
+        DatabaseProperty::People { .. } => "People",
+        DatabaseProperty::PhoneNumber { .. } => "PhoneNumber",
+        DatabaseProperty::Relation { .. } => "Relation",
+        DatabaseProperty::RichText { .. } => "RichText",
+        DatabaseProperty::Rollup { .. } => "Rollup",
+        DatabaseProperty::Select { .. } => "Select",
+        DatabaseProperty::Status { .. } => "Status",
+        DatabaseProperty::Title { .. } => "Title",
+        DatabaseProperty::Url { .. } => "Url",
+        DatabaseProperty::Button { .. } => "Button",
+    }
 }
