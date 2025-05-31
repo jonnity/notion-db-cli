@@ -249,7 +249,28 @@ impl NotionClient {
                         },
                     );
                 }
-                DatabaseProperty::Select { select, .. } => todo!(),
+                DatabaseProperty::Select { select, .. } => {
+                    if select
+                        .options
+                        .iter()
+                        .any(|option| option.name.eq(input_value))
+                    {
+                        parsed_properties.insert(
+                            key,
+                            PageProperty::Select {
+                                id: None,
+                                select: Some(SelectPropertyValue {
+                                    id: None,
+                                    name: Some(input_value.to_string()),
+                                    color: None,
+                                }),
+                            },
+                        );
+                    } else {
+                        eprintln!("invalid option for select property.");
+                        process::exit(1);
+                    }
+                }
                 DatabaseProperty::Status { status, .. } => todo!(),
                 DatabaseProperty::Title { .. } => todo!(),
                 DatabaseProperty::Url { .. } => {
