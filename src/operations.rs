@@ -1,4 +1,5 @@
 use chrono::DateTime;
+use email_address_parser::EmailAddress;
 use notion_client::{
     NotionClientError,
     endpoints::{Client, pages::create, search::title},
@@ -175,7 +176,26 @@ impl NotionClient {
                         },
                     );
                 }
-                DatabaseProperty::Email { .. } => todo!(),
+                DatabaseProperty::Email { .. } => {
+                    match EmailAddress::parse(
+                        input_value,
+                        Some(email_address_parser::ParsingOptions { is_lax: true }),
+                    ) {
+                        Some(email) => {
+                            parsed_properties.insert(
+                                key,
+                                PageProperty::Email {
+                                    id: None,
+                                    email: Some(email.to_string()),
+                                },
+                            );
+                        }
+                        None => {
+                            eprintln!("fail to parse the email address.");
+                            process::exit(1);
+                        }
+                    };
+                }
                 DatabaseProperty::MultiSelect { multi_select, .. } => {
                     let options: Vec<String> = multi_select
                         .options
