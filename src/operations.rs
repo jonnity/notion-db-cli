@@ -404,7 +404,7 @@ pub fn get_example_for_database_property(database_property: &DatabaseProperty) -
             .collect::<Vec<String>>()
             .join("/"),
         DatabaseProperty::Title { .. } => "Title".to_string(),
-        DatabaseProperty::Url { .. } => "https://jonnity.com".to_string(),
+        DatabaseProperty::Url { .. } => "https://example.com".to_string(),
         DatabaseProperty::Button { .. } => "-".to_string(),
     }
 }
