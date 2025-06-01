@@ -3,7 +3,9 @@ mod operations;
 
 use clap::Parser;
 use commands::{CliArgs, Commands};
-use operations::{NotionClient, get_example_for_database_property, propery_to_string};
+use operations::{
+    NotionClient, get_example_for_database_property, get_property_value_str, propery_to_string,
+};
 use std::{collections::HashMap, fs::File, process};
 
 #[tokio::main]
@@ -124,5 +126,78 @@ async fn main() {
                 };
             }
         }
+        Commands::DbQuery(args) => {
+            let result = match client.query_database(&args.id, None).await {
+                Ok(result) => result,
+                Err(e) => {
+                    eprintln!("fail to query database");
+                    eprintln!("{}", e);
+                    process::exit(1);
+                }
+            };
+            if result.pages.len().eq(&0) {
+                println!("There is no page in the specified database.");
+            } else if result.has_more {
+                println!("Results are more than 100, and not all results can be displayed.");
+            }
+
+            let keys: Vec<String> = result
+                .pages
+                .get(0)
+                .unwrap()
+                .properties
+                .iter()
+                .map(|(key, _)| key.to_string())
+                .collect();
+            let properties_list: Vec<Vec<String>> = result
+                .pages
+                .iter()
+                .map(|page| {
+                    page.properties
+                        .iter()
+                        .map(|(_, property)| get_property_value_str(property))
+                        .collect::<Vec<String>>()
+                })
+                .collect();
+            match diplay_properties_table(keys, properties_list) {
+                Ok(()) => (),
+                Err(e) => {
+                    eprintln!("fail to diplay properties. {}", e);
+                    process::exit(1);
+                }
+            };
+        }
     }
+}
+
+fn diplay_properties_table(
+    keys: Vec<String>,
+    properties_list: Vec<Vec<String>>,
+) -> Result<(), String> {
+    if !properties_list
+        .iter()
+        .all(|properties| properties.len().eq(&keys.len()))
+    {
+        return Err("The lenght of keys and properties are not matching.".to_string());
+    }
+
+    let mut keys_row = "|".to_string();
+    let mut properties_rows = vec!["|".to_string(); keys.len()];
+
+    for i in 0..keys.len() {
+        let mut max_length = keys[i].len();
+        properties_list.iter().for_each(|properties| {
+            max_length = max_length.max(properties[i].len());
+        });
+        keys_row += &format!(" {:<width$} |", keys[i], width = max_length);
+        for j in 0..properties_list.len() {
+            properties_rows[j] +=
+                &format!(" {:<width$} |", properties_list[j][i], width = max_length);
+        }
+    }
+    println!("{}", keys_row);
+    properties_rows
+        .iter()
+        .for_each(|properties_row| println!("{}", properties_row));
+    Ok(())
 }

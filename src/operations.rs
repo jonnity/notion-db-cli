@@ -2,10 +2,12 @@ use chrono::DateTime;
 use email_address_parser::EmailAddress;
 use notion_client::{
     NotionClientError,
-    endpoints::{Client, pages::create, search::title},
+    endpoints::{
+        Client, databases::query::request::QueryDatabaseRequest, pages::create, search::title,
+    },
     objects::{
         database::{self, DatabaseProperty},
-        page::{DatePropertyValue, PageProperty, SelectPropertyValue},
+        page::{DatePropertyValue, Page, PageProperty, SelectPropertyValue},
         rich_text::{RichText, Text},
     },
 };
@@ -363,6 +365,36 @@ impl NotionClient {
             Err(e) => Err(e),
         }
     }
+
+    pub async fn query_database(
+        &self,
+        database_id: &str,
+        _query: Option<&str>,
+    ) -> Result<QueryDatabaseResult, NotionClientError> {
+        let query_request: QueryDatabaseRequest = QueryDatabaseRequest {
+            ..Default::default()
+        };
+        match self
+            .client
+            .databases
+            .query_a_database(database_id, query_request)
+            .await
+        {
+            Ok(res) => {
+                let pages = res.results.iter().map(|page| page.clone()).collect();
+                Ok(QueryDatabaseResult {
+                    pages: pages,
+                    has_more: res.has_more,
+                })
+            }
+            Err(e) => Err(e),
+        }
+    }
+}
+
+pub struct QueryDatabaseResult {
+    pub pages: Vec<Page>,
+    pub has_more: bool,
 }
 
 pub fn get_example_for_database_property(database_property: &DatabaseProperty) -> String {
@@ -432,5 +464,119 @@ pub fn propery_to_string(database_property: &DatabaseProperty) -> &str {
         DatabaseProperty::Title { .. } => "Title",
         DatabaseProperty::Url { .. } => "Url",
         DatabaseProperty::Button { .. } => "Button",
+    }
+}
+
+pub fn get_property_value_str(property: &PageProperty) -> String {
+    match property {
+        PageProperty::Checkbox { checkbox, .. } => checkbox.to_string(),
+        PageProperty::CreatedBy { created_by, .. } => {
+            created_by.name.clone().unwrap_or("".to_string())
+        }
+        PageProperty::CreatedTime { created_time, .. } => created_time.to_rfc2822(),
+        PageProperty::Date { date, .. } => match date {
+            Some(date) => {
+                if date.start.is_some() && date.end.is_some() {
+                    format!(
+                        "from {:?} to {:?}",
+                        date.start.clone().unwrap(),
+                        date.end.clone().unwrap()
+                    )
+                } else if date.start.is_some() {
+                    format!("{:?}", date.start.clone().unwrap())
+                } else {
+                    "".to_string()
+                }
+            }
+            None => "".to_string(),
+        },
+        PageProperty::Email { email, .. } => email.clone().unwrap_or("".to_string()),
+        PageProperty::LastEditedBy { last_edited_by, .. } => {
+            last_edited_by.name.clone().unwrap_or("".to_string())
+        }
+        PageProperty::LastEditedTime {
+            last_edited_time, ..
+        } => match last_edited_time {
+            Some(date) => date.to_rfc2822(),
+            None => "".to_string(),
+        },
+        PageProperty::MultiSelect { multi_select, .. } => multi_select
+            .iter()
+            .map(|select| select.name.clone().unwrap_or("".to_string()))
+            .collect::<Vec<String>>()
+            .join("/"),
+        PageProperty::Number { number, .. } => match number {
+            Some(number) => number.to_string(),
+            None => "".to_string(),
+        },
+        PageProperty::People { people, .. } => people
+            .iter()
+            .map(|user| user.name.clone().unwrap_or("".to_string()))
+            .collect::<Vec<String>>()
+            .join("/"),
+        PageProperty::PhoneNumber { phone_number, .. } => {
+            phone_number.clone().unwrap_or("".to_string())
+        }
+        PageProperty::RichText { rich_text, .. } => rich_text
+            .iter()
+            .map(|rich_text| rich_text.plain_text().unwrap_or("".to_string()))
+            .collect::<Vec<String>>()
+            .join(""),
+        PageProperty::Select { select, .. } => match select {
+            Some(select) => select.name.clone().unwrap_or("".to_string()),
+            None => "".to_string(),
+        },
+        PageProperty::Status { status, .. } => match status {
+            Some(select) => select.name.clone().unwrap_or("".to_string()),
+            None => "".to_string(),
+        },
+        PageProperty::Title { title, .. } => title
+            .iter()
+            .map(|rich_text| rich_text.plain_text().unwrap_or("".to_string()))
+            .collect::<Vec<String>>()
+            .join(""),
+        PageProperty::Url { url, .. } => url.clone().unwrap_or("".to_string()),
+        PageProperty::UniqueID { unique_id, .. } => match unique_id {
+            Some(unique_id) => format!(
+                "{}{}",
+                unique_id.prefix.clone().unwrap_or("".to_string()),
+                match &unique_id.number {
+                    Some(number) => number.to_string(),
+                    None => "".to_string(),
+                }
+            ),
+            None => "".to_string(),
+        },
+        PageProperty::Verification { verification, .. } => match verification {
+            Some(verification) => {
+                let mut verification_str = match verification.state {
+                    notion_client::objects::page::VerificationState::Verified => {
+                        "verified".to_string()
+                    }
+                    notion_client::objects::page::VerificationState::Unverified => {
+                        "unverified".to_string()
+                    }
+                };
+                if let Some(user) = &verification.verified_by {
+                    if let Some(name) = &user.name {
+                        verification_str += &format!(" by {}", name.clone());
+                    }
+                }
+                if let Some(date) = &verification.date {
+                    if let Some(start_date) = &date.start {
+                        if let Some(end_date) = &date.end {
+                            verification_str +=
+                                &format!(" (from {:?} to {:?})", start_date, end_date);
+                        } else {
+                            verification_str += &format!(" ({:?})", start_date);
+                        }
+                    }
+                } else {
+                }
+                verification_str
+            }
+            None => "".to_string(),
+        },
+        _ => "".to_string(),
     }
 }
