@@ -20,6 +20,8 @@ pub enum Commands {
     DbView(DbViewArgs),
     /// Add the item to the database specified with id
     DbAdd(DbAddArgs),
+    /// Query a database (Filters are not supported yet)
+    DbQuery(DbQueryArgs),
 }
 
 #[derive(Debug, Args)]
@@ -36,4 +38,12 @@ pub struct DbAddArgs {
     pub id: String,
     #[clap(long, short)]
     pub file: String,
+}
+
+#[derive(Debug, Args)]
+pub struct DbQueryArgs {
+    /// Target database id
+    pub id: String,
+    #[clap(long, short)]
+    pub query: Option<String>,
 }
