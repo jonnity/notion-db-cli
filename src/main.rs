@@ -13,26 +13,18 @@ async fn main() {
     let cli = CliArgs::parse();
     let client = NotionClient::new(cli.token);
     match &cli.command {
-        Commands::DbList => {
-            let databases = client.list_database().await;
-            match databases {
-                Err(e) => {
-                    eprintln!("fail to obtain the list of databases.");
-                    eprintln!("{}", e);
-                    process::exit(1);
-                }
-                Ok(databases) => {
-                    println!("the list of databases ({{title}}: {{id}}):");
-                    for database in databases {
-                        println!(
-                            "{}: {}",
-                            database.title[0].plain_text().expect("no title is set"),
-                            database.id.expect("no id is set")
-                        );
-                    }
+        Commands::DbList => match client.list_database().await {
+            Err(e) => {
+                eprintln!("{}", e);
+                process::exit(1);
+            }
+            Ok(databases) => {
+                println!("the list of databases ({{title}}: {{id}}):");
+                for database in databases {
+                    println!("{}: {}", database.title, database.id);
                 }
             }
-        }
+        },
         Commands::DbView(args) => {
             let database = client.view_database(&args.id).await;
             match database {

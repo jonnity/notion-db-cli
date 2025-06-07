@@ -17,11 +17,16 @@ use url;
 
 use std::{
     collections::{BTreeMap, HashMap},
-    process,
+    process, vec,
 };
 
 pub struct NotionClient {
     client: Client,
+}
+
+pub struct DatabaseListResult {
+    pub title: String,
+    pub id: String,
 }
 
 impl NotionClient {
@@ -36,7 +41,7 @@ impl NotionClient {
             }
         }
     }
-    pub async fn list_database(&self) -> Result<Vec<database::Database>, NotionClientError> {
+    pub async fn list_database(&self) -> Result<Vec<DatabaseListResult>, String> {
         let list_database_request = title::request::SearchByTitleRequest {
             filter: Some(title::request::Filter {
                 value: title::request::FilterValue::Database,
@@ -51,15 +56,23 @@ impl NotionClient {
             .search_by_title(list_database_request)
             .await;
         match response {
-            Err(e) => return Err(e),
+            Err(e) => {
+                return Err(format!(
+                    "Fail to obtain the list of databases. {}",
+                    e.to_string()
+                ));
+            }
             Ok(response) => {
-                let mut databases: Vec<database::Database> = vec![];
+                let mut database_list: Vec<DatabaseListResult> = vec![];
                 for page_or_database in response.results {
                     if let title::response::PageOrDatabase::Database(database) = page_or_database {
-                        databases.push(database);
+                        database_list.push(DatabaseListResult {
+                            title: database.title[0].plain_text().expect("no title is set"),
+                            id: database.id.expect("no id is set"),
+                        });
                     };
                 }
-                return Ok(databases);
+                return Ok(database_list);
             }
         }
     }
