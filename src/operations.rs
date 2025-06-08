@@ -28,6 +28,11 @@ pub struct DatabaseListResult {
     pub title: String,
     pub id: String,
 }
+pub struct DatabaseViewResult {
+    pub key: String,
+    pub r#type: String,
+    pub example: String,
+}
 
 impl NotionClient {
     pub fn new(token: String) -> Self {
@@ -77,14 +82,28 @@ impl NotionClient {
         }
     }
 
-    pub async fn view_database(
+    pub async fn get_database_properties(
         &self,
         database_id: &str,
-    ) -> Result<database::Database, NotionClientError> {
-        let database = self.client.databases.retrieve_a_database(database_id).await;
-        match database {
-            Err(e) => return Err(e),
-            Ok(database) => return Ok(database),
+    ) -> Result<Vec<DatabaseViewResult>, String> {
+        match self.retrieve_database(database_id).await {
+            Err(e) => {
+                return Err(format!(
+                    "Fail to retrieve the databases information. {}",
+                    e.to_string()
+                ));
+            }
+            Ok(database) => {
+                let mut database_properties: Vec<DatabaseViewResult> = vec![];
+                for (key, property) in database.properties {
+                    database_properties.push(DatabaseViewResult {
+                        key,
+                        r#type: propery_to_string(&property.clone()),
+                        example: get_example_for_database_property(&property.clone()),
+                    })
+                }
+                return Ok(database_properties);
+            }
         }
     }
 
@@ -93,7 +112,7 @@ impl NotionClient {
         database_id: &str,
         properties: HashMap<&str, &str>,
     ) -> Result<(), NotionClientError> {
-        let target_db = match self.view_database(database_id).await {
+        let target_db = match self.retrieve_database(database_id).await {
             Ok(database) => database,
             Err(e) => return Err(e),
         };
@@ -403,6 +422,17 @@ impl NotionClient {
             Err(e) => Err(e),
         }
     }
+
+    async fn retrieve_database(
+        &self,
+        database_id: &str,
+    ) -> Result<database::Database, NotionClientError> {
+        let database = self.client.databases.retrieve_a_database(database_id).await;
+        match database {
+            Err(e) => return Err(e),
+            Ok(database) => return Ok(database),
+        }
+    }
 }
 
 pub struct QueryDatabaseResult {
@@ -454,29 +484,29 @@ pub fn get_example_for_database_property(database_property: &DatabaseProperty) -
     }
 }
 
-pub fn propery_to_string(database_property: &DatabaseProperty) -> &str {
+pub fn propery_to_string(database_property: &DatabaseProperty) -> String {
     match database_property {
-        DatabaseProperty::Checkbox { .. } => "Checkbox",
-        DatabaseProperty::CreatedBy { .. } => "CreatedBy",
-        DatabaseProperty::CreatedTime { .. } => "CreatedTime",
-        DatabaseProperty::Date { .. } => "Date",
-        DatabaseProperty::Email { .. } => "Email",
-        DatabaseProperty::Files { .. } => "Files",
-        DatabaseProperty::Formula { .. } => "Formula",
-        DatabaseProperty::LastEditedBy { .. } => "LastEditedBy",
-        DatabaseProperty::LastEditedTime { .. } => "LastEditedTime",
-        DatabaseProperty::MultiSelect { .. } => "MultiSelect",
-        DatabaseProperty::Number { .. } => "Number",
-        DatabaseProperty::People { .. } => "People",
-        DatabaseProperty::PhoneNumber { .. } => "PhoneNumber",
-        DatabaseProperty::Relation { .. } => "Relation",
-        DatabaseProperty::RichText { .. } => "RichText",
-        DatabaseProperty::Rollup { .. } => "Rollup",
-        DatabaseProperty::Select { .. } => "Select",
-        DatabaseProperty::Status { .. } => "Status",
-        DatabaseProperty::Title { .. } => "Title",
-        DatabaseProperty::Url { .. } => "Url",
-        DatabaseProperty::Button { .. } => "Button",
+        DatabaseProperty::Checkbox { .. } => "Checkbox".to_string(),
+        DatabaseProperty::CreatedBy { .. } => "CreatedBy".to_string(),
+        DatabaseProperty::CreatedTime { .. } => "CreatedTime".to_string(),
+        DatabaseProperty::Date { .. } => "Date".to_string(),
+        DatabaseProperty::Email { .. } => "Email".to_string(),
+        DatabaseProperty::Files { .. } => "Files".to_string(),
+        DatabaseProperty::Formula { .. } => "Formula".to_string(),
+        DatabaseProperty::LastEditedBy { .. } => "LastEditedBy".to_string(),
+        DatabaseProperty::LastEditedTime { .. } => "LastEditedTime".to_string(),
+        DatabaseProperty::MultiSelect { .. } => "MultiSelect".to_string(),
+        DatabaseProperty::Number { .. } => "Number".to_string(),
+        DatabaseProperty::People { .. } => "People".to_string(),
+        DatabaseProperty::PhoneNumber { .. } => "PhoneNumber".to_string(),
+        DatabaseProperty::Relation { .. } => "Relation".to_string(),
+        DatabaseProperty::RichText { .. } => "RichText".to_string(),
+        DatabaseProperty::Rollup { .. } => "Rollup".to_string(),
+        DatabaseProperty::Select { .. } => "Select".to_string(),
+        DatabaseProperty::Status { .. } => "Status".to_string(),
+        DatabaseProperty::Title { .. } => "Title".to_string(),
+        DatabaseProperty::Url { .. } => "Url".to_string(),
+        DatabaseProperty::Button { .. } => "Button".to_string(),
     }
 }
 

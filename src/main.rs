@@ -3,10 +3,8 @@ mod operations;
 
 use clap::Parser;
 use commands::{CliArgs, Commands};
-use operations::{
-    NotionClient, get_example_for_database_property, get_property_value_str, propery_to_string,
-};
-use std::{collections::HashMap, fs::File, process};
+use operations::{NotionClient, get_property_value_str};
+use std::{collections::HashMap, fs::File, process, vec};
 
 #[tokio::main]
 async fn main() {
@@ -25,57 +23,52 @@ async fn main() {
                 }
             }
         },
-        Commands::DbView(args) => {
-            let database = client.view_database(&args.id).await;
-            match database {
-                Err(e) => {
-                    eprintln!("fail to retrieve the databases information.");
-                    eprintln!("{}", e);
-                    process::exit(1);
-                }
-                Ok(database) => {
-                    if let Some(file_path) = &args.file {
-                        let (property_keys, property_examples): (Vec<String>, Vec<String>) =
-                            database
-                                .properties
-                                .iter()
-                                .map(|(name, property)| {
-                                    (name.clone(), get_example_for_database_property(property))
-                                })
-                                .collect();
-                        let property_keys_csv = property_keys.join(", ");
-                        let property_example_csv = property_examples.join(", ");
-                        let content = format!("{}\n{}", property_keys_csv, property_example_csv);
-                        match std::fs::write(file_path, content) {
-                            Ok(_) => println!("Successfully wrote to {}", file_path),
-                            Err(e) => {
-                                eprintln!("Failed to write to file: {}", e);
-                                process::exit(1);
-                            }
-                        }
-                    } else {
-                        println!("the structure and columns of the database are as follows:");
-                        let mut property_keys_row = "|".to_string();
-                        let mut property_type_row = "|".to_string();
-                        database.properties.iter().for_each(|(name, property)| {
-                            let property = propery_to_string(property);
-
-                            let name_len = name.chars().count();
-                            let type_len = property.chars().count();
-                            let max_len = name_len.max(type_len);
-                            let pudded_key =
-                                format!(" {:<width$} |", name, width = max_len).to_string();
-                            let pudded_type =
-                                format!(" {:<width$} |", property, width = max_len).to_string();
-                            property_keys_row += &pudded_key;
-                            property_type_row += &pudded_type;
-                        });
-                        println!("{}", property_keys_row);
-                        println!("{}", property_type_row);
+        Commands::DbView(args) => match client.get_database_properties(&args.id).await {
+            Err(e) => {
+                eprintln!("fail to retrieve the databases information.");
+                eprintln!("{}", e);
+                process::exit(1);
+            }
+            Ok(properties) => {
+                if let Some(file_path) = &args.file {
+                    let mut property_keys: Vec<String> = vec![];
+                    let mut property_examples: Vec<String> = vec![];
+                    for property in properties {
+                        property_keys.push(property.key);
+                        property_examples.push(property.example);
                     }
+                    let property_keys_csv = property_keys.join(", ");
+                    let property_example_csv = property_examples.join(", ");
+                    let content = format!("{}\n{}", property_keys_csv, property_example_csv);
+                    match std::fs::write(file_path, content) {
+                        Ok(_) => println!("Successfully wrote to {}", file_path),
+                        Err(e) => {
+                            eprintln!("Failed to write to file: {}", e);
+                            process::exit(1);
+                        }
+                    }
+                } else {
+                    println!("the structure and columns of the database are as follows:");
+                    let mut property_keys_row = "|".to_string();
+                    let mut property_type_row = "|".to_string();
+                    properties.iter().for_each(|property| {
+                        let property_type = &property.r#type;
+                        let key = &property.key;
+
+                        let name_len = key.chars().count();
+                        let type_len = property_type.chars().count();
+                        let max_len = name_len.max(type_len);
+                        let pudded_key = format!(" {:<width$} |", key, width = max_len).to_string();
+                        let pudded_type =
+                            format!(" {:<width$} |", property_type, width = max_len).to_string();
+                        property_keys_row += &pudded_key;
+                        property_type_row += &pudded_type;
+                    });
+                    println!("{}", property_keys_row);
+                    println!("{}", property_type_row);
                 }
             }
-        }
+        },
         Commands::DbAdd(args) => {
             let file = File::open(&args.file).unwrap();
             let mut reader = csv::ReaderBuilder::new()
