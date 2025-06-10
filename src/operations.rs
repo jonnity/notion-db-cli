@@ -34,6 +34,12 @@ pub struct DatabaseViewResult {
     pub example: String,
 }
 
+pub struct DatabaseQueryResult {
+    pub keys: Vec<String>,
+    pub properties_list: Vec<Vec<String>>,
+    pub has_more: bool,
+}
+
 impl NotionClient {
     pub fn new(token: String) -> Self {
         let client = Client::new(token, None);
@@ -409,7 +415,7 @@ impl NotionClient {
         &self,
         database_id: &str,
         _query: Option<&str>,
-    ) -> Result<QueryDatabaseResult, NotionClientError> {
+    ) -> Result<DatabaseQueryResult, NotionClientError> {
         let query_request: QueryDatabaseRequest = QueryDatabaseRequest {
             ..Default::default()
         };
@@ -420,9 +426,27 @@ impl NotionClient {
             .await
         {
             Ok(res) => {
-                let pages = res.results.iter().map(|page| page.clone()).collect();
-                Ok(QueryDatabaseResult {
-                    pages: pages,
+                let pages: Vec<Page> = res.results.iter().map(|page| page.clone()).collect();
+                let keys: Vec<String> = pages
+                    .get(0)
+                    .unwrap()
+                    .properties
+                    .iter()
+                    .map(|(key, _)| key.to_string())
+                    .collect();
+                let properties_list: Vec<Vec<String>> = pages
+                    .iter()
+                    .map(|page| {
+                        page.properties
+                            .iter()
+                            .map(|(_, property)| get_property_value_str(property))
+                            .collect::<Vec<String>>()
+                    })
+                    .collect();
+
+                Ok(DatabaseQueryResult {
+                    keys: keys,
+                    properties_list: properties_list,
                     has_more: res.has_more,
                 })
             }

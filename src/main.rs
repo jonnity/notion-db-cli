@@ -101,31 +101,11 @@ async fn main() {
                     process::exit(1);
                 }
             };
-            if result.pages.len().eq(&0) {
-                println!("There is no page in the specified database.");
-            } else if result.has_more {
+            if result.has_more {
                 println!("Results are more than 100, and not all results can be displayed.");
             }
 
-            let keys: Vec<String> = result
-                .pages
-                .get(0)
-                .unwrap()
-                .properties
-                .iter()
-                .map(|(key, _)| key.to_string())
-                .collect();
-            let properties_list: Vec<Vec<String>> = result
-                .pages
-                .iter()
-                .map(|page| {
-                    page.properties
-                        .iter()
-                        .map(|(_, property)| get_property_value_str(property))
-                        .collect::<Vec<String>>()
-                })
-                .collect();
-            match diplay_properties_table(keys, properties_list) {
+            match diplay_properties_table(result.keys, result.properties_list) {
                 Ok(()) => (),
                 Err(e) => {
                     eprintln!("fail to diplay properties. {}", e);
