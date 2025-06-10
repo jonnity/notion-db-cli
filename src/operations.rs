@@ -110,7 +110,7 @@ impl NotionClient {
     pub async fn add_item_to_database(
         &self,
         database_id: &str,
-        properties: HashMap<&str, &str>,
+        properties: &HashMap<String, String>,
     ) -> Result<(), NotionClientError> {
         let target_db = match self.retrieve_database(database_id).await {
             Ok(database) => database,
@@ -124,7 +124,7 @@ impl NotionClient {
 
         let mut parsed_properties = BTreeMap::<String, PageProperty>::new();
         for (key, property) in target_db.properties {
-            let input_value = *properties.get(&key as &str).unwrap();
+            let input_value = properties.get(&key as &str).unwrap();
             match property {
                 DatabaseProperty::Checkbox { .. } => {
                     let input_value: bool = match input_value.parse() {

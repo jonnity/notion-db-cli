@@ -1,10 +1,11 @@
 mod commands;
+mod csv_reader;
 mod operations;
 
 use clap::Parser;
 use commands::{CliArgs, Commands};
 use operations::{NotionClient, get_property_value_str};
-use std::{collections::HashMap, fs::File, process, vec};
+use std::{process, vec};
 
 #[tokio::main]
 async fn main() {
@@ -70,36 +71,16 @@ async fn main() {
             }
         },
         Commands::DbAdd(args) => {
-            let file = File::open(&args.file).unwrap();
-            let mut reader = csv::ReaderBuilder::new()
-                .has_headers(true)
-                .trim(csv::Trim::All)
-                .from_reader(file);
-            let headers = match reader.headers() {
-                Ok(headers) => headers.clone(),
+            let csv_records = match csv_reader::CsvRecords::new(&args.file) {
+                Ok(csv_records) => csv_records,
                 Err(e) => {
-                    eprintln!("fail to read headers from csv.");
                     eprintln!("{}", e);
                     process::exit(1);
                 }
             };
 
-            for record in reader.records() {
-                let record = match record {
-                    Ok(record) => record,
-                    Err(e) => {
-                        eprintln!("fail to read a record in csv.");
-                        eprintln!("{}", e);
-                        process::exit(1);
-                    }
-                };
-                let mut properties = HashMap::<&str, &str>::new();
-                for i in 0..record.len() {
-                    let header = headers.get(i).unwrap();
-                    let value = record.get(i).unwrap();
-                    properties.insert(header, value);
-                }
-                match client.add_item_to_database(&args.id, properties).await {
+            for properties in csv_records {
+                match client.add_item_to_database(&args.id, &properties).await {
                     Ok(()) => (),
                     Err(e) => {
                         eprintln!(
