@@ -1,0 +1,3 @@
+Name, Files & media, Select, URL, Date, Multi-select, Last edited by, Text, Email, Person, Created time, Number, Checkbox, Created by, Formula, Last edited time, Status, Phone
+Title1, -, foo, https://first.example.com, 2020-12-07T12:00:00Z/from 2020-12-08T12:00:00Z to 2020-12-09T12:00:00Z, select/multi, -, only plain text is supported, foo@example.com, -, -, 123, true/false, -, -, -, To-do/In progress/Complete, 123-456-7890
+Title2, -, bar, https://second.example.com, 2020-12-07T12:00:00Z/from 2020-12-08T12:00:00Z to 2020-12-09T12:00:00Z, select/multi, -, only plain text is supported, foo@example.com, -, -, 123, true/false, -, -, -, To-do/In progress/Complete, 123-456-7890

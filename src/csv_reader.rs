@@ -1,8 +1,9 @@
-use std::fs::File;
+use std::{collections::HashMap, fs::File};
 
 pub struct CsvRecords {
     headers: Vec<String>,
     records: Vec<Vec<String>>,
+    current_index: usize,
 }
 
 impl CsvRecords {
@@ -56,6 +57,46 @@ impl CsvRecords {
         Ok(CsvRecords {
             headers: headers,
             records: records,
+            current_index: 0,
         })
+    }
+}
+
+impl Iterator for CsvRecords {
+    type Item = HashMap<String, String>;
+    fn next(&mut self) -> Option<Self::Item> {
+        println!("index: {}", self.current_index);
+        if let Some(current) = self.records.get(self.current_index) {
+            let mut header_record_pair = HashMap::<String, String>::new();
+            for i in 0..self.headers.len() {
+                header_record_pair.insert(self.headers[i].clone(), current[i].clone());
+            }
+            self.current_index += 1;
+            return Some(header_record_pair);
+        } else {
+            self.current_index = 0;
+            return None;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CsvRecords;
+    #[test]
+    fn read_csv() {
+        let mut records = CsvRecords::new("./test_files/test_csv_2_rows").unwrap();
+        let first = records.next();
+        assert!(first.is_some());
+        let second = records.next();
+        assert!(second.is_some());
+        let third = records.next();
+        assert!(third.is_none());
+    }
+
+    #[test]
+    fn invalid_csv() {
+        let records = CsvRecords::new("./test_files/test_invalid");
+        assert!(records.is_err());
     }
 }
