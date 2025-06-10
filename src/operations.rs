@@ -238,7 +238,11 @@ impl NotionClient {
                         .iter()
                         .map(|option| option.name.clone())
                         .collect();
-                    if !options.iter().any(|option| option.eq(input_value)) {
+                    let values: Vec<&str> = input_value.split("/").collect();
+                    if !values
+                        .iter()
+                        .all(|value| options.contains(&value.to_string()))
+                    {
                         eprintln!(
                             "{} cannot be used as an input for {}. Please select from following options: {}",
                             input_value,
@@ -251,11 +255,14 @@ impl NotionClient {
                         key,
                         PageProperty::MultiSelect {
                             id: None,
-                            multi_select: vec![SelectPropertyValue {
-                                name: Some(input_value.to_string()),
-                                color: None,
-                                id: None,
-                            }],
+                            multi_select: values
+                                .iter()
+                                .map(|value| SelectPropertyValue {
+                                    name: Some(value.to_string()),
+                                    color: None,
+                                    id: None,
+                                })
+                                .collect(),
                         },
                     );
                 }
