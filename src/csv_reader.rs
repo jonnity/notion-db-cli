@@ -65,7 +65,6 @@ impl CsvRecords {
 impl Iterator for CsvRecords {
     type Item = HashMap<String, String>;
     fn next(&mut self) -> Option<Self::Item> {
-        println!("index: {}", self.current_index);
         if let Some(current) = self.records.get(self.current_index) {
             let mut header_record_pair = HashMap::<String, String>::new();
             for i in 0..self.headers.len() {
