@@ -24,7 +24,7 @@ async fn main() {
                 process::exit(1);
             }
             Ok(databases) => {
-                println!("the list of databases ({{title}}: {{id}}):");
+                println!("The list of databases ({{title}}: {{id}}):");
                 for database in databases {
                     println!("{}: {}", database.title, database.id);
                 }
@@ -32,7 +32,7 @@ async fn main() {
         },
         Commands::DbView(args) => match client.get_database_properties(&args.id).await {
             Err(e) => {
-                eprintln!("fail to retrieve the databases information.");
+                eprintln!("Fail to retrieve the databases information.");
                 eprintln!("{}", e);
                 process::exit(1);
             }
@@ -55,7 +55,7 @@ async fn main() {
                         }
                     }
                 } else {
-                    println!("the structure and columns of the database are as follows:");
+                    println!("The structure and columns of the database are as follows:");
                     let mut property_keys_row = "|".to_string();
                     let mut property_type_row = "|".to_string();
                     properties.iter().for_each(|property| {
@@ -90,7 +90,7 @@ async fn main() {
                     Ok(()) => (),
                     Err(e) => {
                         eprintln!(
-                            "error has occured during creating new database item in a record of csv."
+                            "Error has occured during creating new database item in a record of csv."
                         );
                         eprintln!("{}", e);
                         process::exit(1);
@@ -102,7 +102,7 @@ async fn main() {
             let result = match client.query_database(&args.id, None).await {
                 Ok(result) => result,
                 Err(e) => {
-                    eprintln!("fail to query database");
+                    eprintln!("Fail to query database");
                     eprintln!("{}", e);
                     process::exit(1);
                 }
