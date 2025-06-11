@@ -1,124 +1,91 @@
 mod commands;
+mod csv_reader;
 mod operations;
 
 use clap::Parser;
 use commands::{CliArgs, Commands};
-use operations::{
-    NotionClient, get_example_for_database_property, get_property_value_str, propery_to_string,
-};
-use std::{collections::HashMap, fs::File, process};
+use operations::NotionClient;
+use std::{process, vec};
 
 #[tokio::main]
 async fn main() {
     let cli = CliArgs::parse();
-    let client = NotionClient::new(cli.token);
+    let client = match NotionClient::new(cli.token) {
+        Ok(client) => client,
+        Err(e) => {
+            eprintln!("{}", e);
+            process::exit(1);
+        }
+    };
     match &cli.command {
-        Commands::DbList => {
-            let databases = client.list_database().await;
-            match databases {
-                Err(e) => {
-                    eprintln!("fail to obtain the list of databases.");
-                    eprintln!("{}", e);
-                    process::exit(1);
-                }
-                Ok(databases) => {
-                    println!("the list of databases ({{title}}: {{id}}):");
-                    for database in databases {
-                        println!(
-                            "{}: {}",
-                            database.title[0].plain_text().expect("no title is set"),
-                            database.id.expect("no id is set")
-                        );
-                    }
+        Commands::DbList => match client.list_database().await {
+            Err(e) => {
+                eprintln!("{}", e);
+                process::exit(1);
+            }
+            Ok(databases) => {
+                println!("The list of databases ({{title}}: {{id}}):");
+                for database in databases {
+                    println!("{}: {}", database.title, database.id);
                 }
             }
-        }
-        Commands::DbView(args) => {
-            let database = client.view_database(&args.id).await;
-            match database {
-                Err(e) => {
-                    eprintln!("fail to retrieve the databases information.");
-                    eprintln!("{}", e);
-                    process::exit(1);
-                }
-                Ok(database) => {
-                    if let Some(file_path) = &args.file {
-                        let (property_keys, property_examples): (Vec<String>, Vec<String>) =
-                            database
-                                .properties
-                                .iter()
-                                .map(|(name, property)| {
-                                    (name.clone(), get_example_for_database_property(property))
-                                })
-                                .collect();
-                        let property_keys_csv = property_keys.join(", ");
-                        let property_example_csv = property_examples.join(", ");
-                        let content = format!("{}\n{}", property_keys_csv, property_example_csv);
-                        match std::fs::write(file_path, content) {
-                            Ok(_) => println!("Successfully wrote to {}", file_path),
-                            Err(e) => {
-                                eprintln!("Failed to write to file: {}", e);
-                                process::exit(1);
-                            }
+        },
+        Commands::DbView(args) => match client.get_database_properties(&args.id).await {
+            Err(e) => {
+                eprintln!("Fail to retrieve the databases information.");
+                eprintln!("{}", e);
+                process::exit(1);
+            }
+            Ok(properties) => {
+                if let Some(file_path) = &args.file {
+                    let mut property_keys: Vec<String> = vec![];
+                    let mut property_examples: Vec<String> = vec![];
+                    for property in properties {
+                        property_keys.push(property.key);
+                        property_examples.push(property.example);
+                    }
+                    let property_keys_csv = property_keys.join(", ");
+                    let property_example_csv = property_examples.join(", ");
+                    let content = format!("{}\n{}", property_keys_csv, property_example_csv);
+                    match std::fs::write(file_path, content) {
+                        Ok(_) => println!("Successfully wrote to {}", file_path),
+                        Err(e) => {
+                            eprintln!("Failed to write to file: {}", e);
+                            process::exit(1);
                         }
-                    } else {
-                        println!("the structure and columns of the database are as follows:");
-                        let mut property_keys_row = "|".to_string();
-                        let mut property_type_row = "|".to_string();
-                        database.properties.iter().for_each(|(name, property)| {
-                            let property = propery_to_string(property);
-
-                            let name_len = name.chars().count();
-                            let type_len = property.chars().count();
-                            let max_len = name_len.max(type_len);
-                            let pudded_key =
-                                format!(" {:<width$} |", name, width = max_len).to_string();
-                            let pudded_type =
-                                format!(" {:<width$} |", property, width = max_len).to_string();
-                            property_keys_row += &pudded_key;
-                            property_type_row += &pudded_type;
-                        });
-                        println!("{}", property_keys_row);
-                        println!("{}", property_type_row);
+                    }
+                } else {
+                    println!("The structure and columns of the database are as follows:");
+                    let (keys, properties_list) = properties
+                        .iter()
+                        .map(|property| (property.key.clone(), property.r#type.clone()))
+                        .collect::<(Vec<String>, Vec<String>)>();
+                    let properties_list = vec![properties_list];
+                    match make_aligned_string(keys, properties_list) {
+                        Ok(str) => println!("{}", str),
+                        Err(e) => {
+                            eprintln!("fail to diplay properties. {}", e);
+                            process::exit(1);
+                        }
                     }
                 }
             }
-        }
+        },
         Commands::DbAdd(args) => {
-            let file = File::open(&args.file).unwrap();
-            let mut reader = csv::ReaderBuilder::new()
-                .has_headers(true)
-                .trim(csv::Trim::All)
-                .from_reader(file);
-            let headers = match reader.headers() {
-                Ok(headers) => headers.clone(),
+            let csv_records = match csv_reader::CsvRecords::new(&args.file) {
+                Ok(csv_records) => csv_records,
                 Err(e) => {
-                    eprintln!("fail to read headers from csv.");
                     eprintln!("{}", e);
                     process::exit(1);
                 }
             };
 
-            for record in reader.records() {
-                let record = match record {
-                    Ok(record) => record,
-                    Err(e) => {
-                        eprintln!("fail to read a record in csv.");
-                        eprintln!("{}", e);
-                        process::exit(1);
-                    }
-                };
-                let mut properties = HashMap::<&str, &str>::new();
-                for i in 0..record.len() {
-                    let header = headers.get(i).unwrap();
-                    let value = record.get(i).unwrap();
-                    properties.insert(header, value);
-                }
-                match client.add_item_to_database(&args.id, properties).await {
+            for properties in csv_records {
+                match client.add_item_to_database(&args.id, &properties).await {
                     Ok(()) => (),
                     Err(e) => {
                         eprintln!(
-                            "error has occured during creating new database item in a record of csv."
+                            "Error has occured during creating new database item in a record of csv."
                         );
                         eprintln!("{}", e);
                         process::exit(1);
@@ -130,37 +97,17 @@ async fn main() {
             let result = match client.query_database(&args.id, None).await {
                 Ok(result) => result,
                 Err(e) => {
-                    eprintln!("fail to query database");
+                    eprintln!("Fail to query database");
                     eprintln!("{}", e);
                     process::exit(1);
                 }
             };
-            if result.pages.len().eq(&0) {
-                println!("There is no page in the specified database.");
-            } else if result.has_more {
+            if result.has_more {
                 println!("Results are more than 100, and not all results can be displayed.");
             }
 
-            let keys: Vec<String> = result
-                .pages
-                .get(0)
-                .unwrap()
-                .properties
-                .iter()
-                .map(|(key, _)| key.to_string())
-                .collect();
-            let properties_list: Vec<Vec<String>> = result
-                .pages
-                .iter()
-                .map(|page| {
-                    page.properties
-                        .iter()
-                        .map(|(_, property)| get_property_value_str(property))
-                        .collect::<Vec<String>>()
-                })
-                .collect();
-            match diplay_properties_table(keys, properties_list) {
-                Ok(()) => (),
+            match make_aligned_string(result.keys, result.properties_list) {
+                Ok(str) => println!("{}", str),
                 Err(e) => {
                     eprintln!("fail to diplay properties. {}", e);
                     process::exit(1);
@@ -170,10 +117,10 @@ async fn main() {
     }
 }
 
-fn diplay_properties_table(
+fn make_aligned_string(
     keys: Vec<String>,
     properties_list: Vec<Vec<String>>,
-) -> Result<(), String> {
+) -> Result<String, String> {
     if !properties_list
         .iter()
         .all(|properties| properties.len().eq(&keys.len()))
@@ -182,7 +129,7 @@ fn diplay_properties_table(
     }
 
     let mut keys_row = "|".to_string();
-    let mut properties_rows = vec!["|".to_string(); keys.len()];
+    let mut properties_rows = vec!["|".to_string(); properties_list.len()];
 
     for i in 0..keys.len() {
         let mut max_length = keys[i].len();
@@ -195,9 +142,22 @@ fn diplay_properties_table(
                 &format!(" {:<width$} |", properties_list[j][i], width = max_length);
         }
     }
-    println!("{}", keys_row);
-    properties_rows
-        .iter()
-        .for_each(|properties_row| println!("{}", properties_row));
-    Ok(())
+    Ok(format!("{}\n{}", keys_row, properties_rows.join("\n")))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::make_aligned_string;
+
+    #[test]
+    fn read_csv() {
+        let test_keys = vec!["1".to_string(), "12".to_string(), "12345".to_string()];
+        let test_properties: Vec<Vec<String>> =
+            vec![vec!["1".to_string(), "1".to_string(), "1".to_string()]];
+        let result = make_aligned_string(test_keys, test_properties);
+        assert_eq!(
+            result,
+            Ok("| 1 | 12 | 12345 |\n| 1 | 1  | 1     |".to_string())
+        );
+    }
 }
