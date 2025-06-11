@@ -56,23 +56,18 @@ async fn main() {
                     }
                 } else {
                     println!("The structure and columns of the database are as follows:");
-                    let mut property_keys_row = "|".to_string();
-                    let mut property_type_row = "|".to_string();
-                    properties.iter().for_each(|property| {
-                        let property_type = &property.r#type;
-                        let key = &property.key;
-
-                        let name_len = key.chars().count();
-                        let type_len = property_type.chars().count();
-                        let max_len = name_len.max(type_len);
-                        let pudded_key = format!(" {:<width$} |", key, width = max_len).to_string();
-                        let pudded_type =
-                            format!(" {:<width$} |", property_type, width = max_len).to_string();
-                        property_keys_row += &pudded_key;
-                        property_type_row += &pudded_type;
-                    });
-                    println!("{}", property_keys_row);
-                    println!("{}", property_type_row);
+                    let (keys, properties_list) = properties
+                        .iter()
+                        .map(|property| (property.key.clone(), property.r#type.clone()))
+                        .collect::<(Vec<String>, Vec<String>)>();
+                    let properties_list = vec![properties_list];
+                    match make_aligned_string(keys, properties_list) {
+                        Ok(str) => println!("{}", str),
+                        Err(e) => {
+                            eprintln!("fail to diplay properties. {}", e);
+                            process::exit(1);
+                        }
+                    }
                 }
             }
         },
