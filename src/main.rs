@@ -111,8 +111,8 @@ async fn main() {
                 println!("Results are more than 100, and not all results can be displayed.");
             }
 
-            match diplay_properties_table(result.keys, result.properties_list) {
-                Ok(()) => (),
+            match make_aligned_string(result.keys, result.properties_list) {
+                Ok(str) => println!("{}", str),
                 Err(e) => {
                     eprintln!("fail to diplay properties. {}", e);
                     process::exit(1);
@@ -122,10 +122,10 @@ async fn main() {
     }
 }
 
-fn diplay_properties_table(
+fn make_aligned_string(
     keys: Vec<String>,
     properties_list: Vec<Vec<String>>,
-) -> Result<(), String> {
+) -> Result<String, String> {
     if !properties_list
         .iter()
         .all(|properties| properties.len().eq(&keys.len()))
@@ -134,7 +134,7 @@ fn diplay_properties_table(
     }
 
     let mut keys_row = "|".to_string();
-    let mut properties_rows = vec!["|".to_string(); keys.len()];
+    let mut properties_rows = vec!["|".to_string(); properties_list.len()];
 
     for i in 0..keys.len() {
         let mut max_length = keys[i].len();
@@ -147,9 +147,22 @@ fn diplay_properties_table(
                 &format!(" {:<width$} |", properties_list[j][i], width = max_length);
         }
     }
-    println!("{}", keys_row);
-    properties_rows
-        .iter()
-        .for_each(|properties_row| println!("{}", properties_row));
-    Ok(())
+    Ok(format!("{}\n{}", keys_row, properties_rows.join("\n")))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::make_aligned_string;
+
+    #[test]
+    fn read_csv() {
+        let test_keys = vec!["1".to_string(), "12".to_string(), "12345".to_string()];
+        let test_properties: Vec<Vec<String>> =
+            vec![vec!["1".to_string(), "1".to_string(), "1".to_string()]];
+        let result = make_aligned_string(test_keys, test_properties);
+        assert_eq!(
+            result,
+            Ok("| 1 | 12 | 12345 |\n| 1 | 1  | 1     |".to_string())
+        );
+    }
 }
