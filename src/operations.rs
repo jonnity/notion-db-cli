@@ -17,7 +17,7 @@ use url;
 
 use std::{
     collections::{BTreeMap, HashMap},
-    process, vec,
+    vec,
 };
 
 pub struct NotionClient {
@@ -41,14 +41,12 @@ pub struct DatabaseQueryResult {
 }
 
 impl NotionClient {
-    pub fn new(token: String) -> Self {
+    pub fn new(token: String) -> Result<Self, String> {
         let client = Client::new(token, None);
         match client {
-            Ok(client) => return Self { client: client },
+            Ok(client) => return Ok(Self { client: client }),
             Err(e) => {
-                eprintln!("fail to obtain a client.");
-                eprintln!("{}", e);
-                process::exit(1);
+                return Err(format!("Fail to obtain a client.\n{}", e));
             }
         }
     }
@@ -117,15 +115,19 @@ impl NotionClient {
         &self,
         database_id: &str,
         properties: &HashMap<String, String>,
-    ) -> Result<(), NotionClientError> {
+    ) -> Result<(), String> {
         let target_db = match self.retrieve_database(database_id).await {
             Ok(database) => database,
-            Err(e) => return Err(e),
+            Err(e) => {
+                return Err(format!(
+                    "Fail to retrieve the database to add items.\n{}",
+                    e
+                ));
+            }
         };
 
         if properties.len().ne(&target_db.properties.len()) {
-            eprintln!("the lengths of keys in Notion DB and in csv header differ.");
-            process::exit(1);
+            return Err("The lengths of keys in Notion DB and in csv header differ.".to_string());
         }
 
         let mut parsed_properties = BTreeMap::<String, PageProperty>::new();
@@ -136,12 +138,10 @@ impl NotionClient {
                     let input_value: bool = match input_value.parse() {
                         Ok(b) => b,
                         Err(e) => {
-                            eprintln!(
-                                "{} cannot be parsed as an input for {}. Please enter \"true\" or \"false\" as a Checkbox property.",
-                                input_value, key
-                            );
-                            eprintln!("{}", e);
-                            process::exit(1);
+                            return Err(format!(
+                                "{} cannot be parsed as an input for {}. Please enter \"true\" or \"false\" as a Checkbox property.\n{}",
+                                input_value, key, e
+                            ));
                         }
                     };
                     parsed_properties.insert(
@@ -158,29 +158,28 @@ impl NotionClient {
                         let (start_date, end_date) = dates_regex
                             .captures(input_value)
                             .map(|caps| {
-                                let start_date = match DateTime::parse_from_rfc3339(&caps[1])
-                                    .or_else(|_| DateTime::parse_from_rfc2822(&caps[1]))
-                                {
-                                    Ok(date) => date,
-                                    Err(e) => {
-                                        eprintln!("fail to parse the start date string.");
-                                        eprintln!("{}", e);
-                                        process::exit(1);
-                                    }
-                                };
-                                let end_date = match DateTime::parse_from_rfc3339(&caps[2])
-                                    .or_else(|_| DateTime::parse_from_rfc2822(&caps[2]))
-                                {
-                                    Ok(date) => date,
-                                    Err(e) => {
-                                        eprintln!("fail to parse the end date string.");
-                                        eprintln!("{}", e);
-                                        process::exit(1);
-                                    }
-                                };
+                                let start_date = DateTime::parse_from_rfc3339(&caps[1])
+                                    .or_else(|_| DateTime::parse_from_rfc2822(&caps[1]));
+                                let end_date = DateTime::parse_from_rfc3339(&caps[2])
+                                    .or_else(|_| DateTime::parse_from_rfc2822(&caps[2]));
+
                                 (start_date, end_date)
                             })
                             .unwrap();
+
+                        let start_date = match start_date {
+                            Ok(date) => date,
+                            Err(e) => {
+                                return Err(format!("Fail to parse the start date string.\n{}", e));
+                            }
+                        };
+                        let end_date = match end_date {
+                            Ok(date) => date,
+                            Err(e) => {
+                                return Err(format!("Fail to parse the end date string.\n{}", e));
+                            }
+                        };
+
                         DatePropertyValue {
                             start: Some(notion_client::objects::page::DateOrDateTime::DateTime(
                                 start_date.to_utc(),
@@ -196,9 +195,7 @@ impl NotionClient {
                         let date = match date {
                             Ok(date) => date,
                             Err(e) => {
-                                eprintln!("fail to parse the date string.");
-                                eprintln!("{}", e);
-                                process::exit(1);
+                                return Err(format!("Fail to parse the date string.\n{}", e));
                             }
                         };
                         DatePropertyValue {
@@ -233,8 +230,7 @@ impl NotionClient {
                             );
                         }
                         None => {
-                            eprintln!("fail to parse the email address.");
-                            process::exit(1);
+                            return Err("Fail to parse the email address.".to_string());
                         }
                     };
                 }
@@ -249,13 +245,12 @@ impl NotionClient {
                         .iter()
                         .all(|value| options.contains(&value.to_string()))
                     {
-                        eprintln!(
+                        return Err(format!(
                             "{} cannot be used as an input for {}. Please select from following options: {}",
                             input_value,
                             key,
                             options.join(" / ")
-                        );
-                        process::exit(1);
+                        ));
                     }
                     parsed_properties.insert(
                         key,
@@ -283,9 +278,7 @@ impl NotionClient {
                         );
                     }
                     Err(e) => {
-                        eprintln!("fail to parse number.");
-                        eprintln!("{}", e);
-                        process::exit(1);
+                        return Err(format!("Fail to parse a number.\n{}", e));
                     }
                 },
                 DatabaseProperty::PhoneNumber { .. } => {
@@ -332,8 +325,15 @@ impl NotionClient {
                             },
                         );
                     } else {
-                        eprintln!("invalid option for select property.");
-                        process::exit(1);
+                        return Err(format!(
+                            "invalid option for select property. The options are following: {}",
+                            select
+                                .options
+                                .iter()
+                                .map(|option| option.name.to_string())
+                                .collect::<Vec<String>>()
+                                .join(" / ")
+                        ));
                     }
                 }
                 DatabaseProperty::Status { status, .. } => {
@@ -354,8 +354,15 @@ impl NotionClient {
                             },
                         );
                     } else {
-                        eprintln!("invalid option for status property.");
-                        process::exit(1);
+                        return Err(format!(
+                            "invalid option for status property. The options are following: {}",
+                            status
+                                .options
+                                .iter()
+                                .map(|option| option.name.to_string())
+                                .collect::<Vec<String>>()
+                                .join(" / ")
+                        ));
                     }
                 }
                 DatabaseProperty::Title { .. } => {
@@ -379,12 +386,10 @@ impl NotionClient {
                     let input_value = match url::Url::parse(input_value) {
                         Ok(b) => b,
                         Err(e) => {
-                            eprintln!(
-                                "{} cannot be parsed as an input for {}. Please enter proper URL as a Url property.",
-                                input_value, key
-                            );
-                            eprintln!("{}", e);
-                            process::exit(1);
+                            return Err(format!(
+                                "{} cannot be parsed as an input for {}. Please enter proper URL as a Url property.\n{}",
+                                input_value, key, e
+                            ));
                         }
                     };
                     parsed_properties.insert(
@@ -407,7 +412,7 @@ impl NotionClient {
         };
         match self.client.pages.create_a_page(request).await {
             Ok(_db) => Ok(()),
-            Err(e) => Err(e),
+            Err(e) => Err(format!("Fail to create a page.\n{}", e)),
         }
     }
 
@@ -464,11 +469,6 @@ impl NotionClient {
             Ok(database) => return Ok(database),
         }
     }
-}
-
-pub struct QueryDatabaseResult {
-    pub pages: Vec<Page>,
-    pub has_more: bool,
 }
 
 pub fn get_example_for_database_property(database_property: &DatabaseProperty) -> String {

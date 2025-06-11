@@ -4,13 +4,19 @@ mod operations;
 
 use clap::Parser;
 use commands::{CliArgs, Commands};
-use operations::{NotionClient, get_property_value_str};
+use operations::NotionClient;
 use std::{process, vec};
 
 #[tokio::main]
 async fn main() {
     let cli = CliArgs::parse();
-    let client = NotionClient::new(cli.token);
+    let client = match NotionClient::new(cli.token) {
+        Ok(client) => client,
+        Err(e) => {
+            eprintln!("{}", e);
+            process::exit(1);
+        }
+    };
     match &cli.command {
         Commands::DbList => match client.list_database().await {
             Err(e) => {
