@@ -18,7 +18,7 @@ async fn main() {
         }
     };
     match &cli.command {
-        Commands::DbList => match client.list_database().await {
+        Commands::List => match client.list_database().await {
             Err(e) => {
                 eprintln!("{}", e);
                 process::exit(1);
@@ -30,7 +30,7 @@ async fn main() {
                 }
             }
         },
-        Commands::DbView(args) => match client.get_database_properties(&args.id).await {
+        Commands::View(args) => match client.get_database_properties(&args.id).await {
             Err(e) => {
                 eprintln!("Fail to retrieve the databases information.");
                 eprintln!("{}", e);
@@ -71,7 +71,7 @@ async fn main() {
                 }
             }
         },
-        Commands::DbAdd(args) => {
+        Commands::Add(args) => {
             let csv_records = match csv_reader::CsvRecords::new(&args.file) {
                 Ok(csv_records) => csv_records,
                 Err(e) => {
@@ -93,7 +93,7 @@ async fn main() {
                 };
             }
         }
-        Commands::DbQuery(args) => {
+        Commands::Query(args) => {
             let result = match client.query_database(&args.id, None).await {
                 Ok(result) => result,
                 Err(e) => {

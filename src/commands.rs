@@ -15,13 +15,17 @@ pub struct CliArgs {
 #[derive(Debug, Subcommand)]
 pub enum Commands {
     /// Show the list of databases
-    DbList,
+    #[clap(name = "db-list")]
+    List,
     /// Show the structure of the database matching the id specified by the argument
-    DbView(DbViewArgs),
+    #[clap(name = "db-view")]
+    View(DbViewArgs),
     /// Add the item to the database specified with id
-    DbAdd(DbAddArgs),
+    #[clap(name = "db-add")]
+    Add(DbAddArgs),
     /// Query a database (Filters are not supported yet)
-    DbQuery(DbQueryArgs),
+    #[clap(name = "db-query")]
+    Query(DbQueryArgs),
 }
 
 #[derive(Debug, Args)]

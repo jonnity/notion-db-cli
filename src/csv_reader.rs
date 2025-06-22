@@ -8,14 +8,10 @@ pub struct CsvRecords {
 
 impl CsvRecords {
     pub fn new(file_path: &str) -> Result<Self, String> {
-        let file = match File::open(&file_path) {
+        let file = match File::open(file_path) {
             Ok(file) => file,
             Err(e) => {
-                return Err(format!(
-                    "File is not found in {}.\n{}",
-                    file_path,
-                    e.to_string()
-                ));
+                return Err(format!("File is not found in {}.\n{}", file_path, e));
             }
         };
         let mut reader = csv::ReaderBuilder::new()
@@ -26,11 +22,7 @@ impl CsvRecords {
         let headers: Vec<String> = match reader.headers() {
             Ok(headers) => headers.iter().map(|header| header.to_string()).collect(),
             Err(e) => {
-                return Err(format!(
-                    "Fail to read headers in {}.\n{}",
-                    file_path,
-                    e.to_string()
-                ));
+                return Err(format!("Fail to read headers in {}.\n{}", file_path, e));
             }
         };
 
@@ -39,24 +31,18 @@ impl CsvRecords {
             match record {
                 Ok(record) => records.push(record.iter().map(|value| value.to_string()).collect()),
                 Err(e) => {
-                    return Err(format!(
-                        "Fail to read a record in {}.\n{}",
-                        file_path,
-                        e.to_string()
-                    ));
+                    return Err(format!("Fail to read a record in {}.\n{}", file_path, e));
                 }
             }
         }
 
         if !records.iter().all(|record| record.len().eq(&headers.len())) {
-            return Err(format!(
-                "The number of a record does not matcdh the number of header.",
-            ));
+            return Err("The number of a record does not matcdh the number of header.".to_string());
         }
 
         Ok(CsvRecords {
-            headers: headers,
-            records: records,
+            headers,
+            records,
             current_index: 0,
         })
     }
@@ -67,14 +53,14 @@ impl Iterator for CsvRecords {
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(current) = self.records.get(self.current_index) {
             let mut header_record_pair = HashMap::<String, String>::new();
-            for i in 0..self.headers.len() {
+            for (i, _) in current.iter().enumerate().take(self.headers.len()) {
                 header_record_pair.insert(self.headers[i].clone(), current[i].clone());
             }
             self.current_index += 1;
-            return Some(header_record_pair);
+            Some(header_record_pair)
         } else {
             self.current_index = 0;
-            return None;
+            None
         }
     }
 }
