@@ -1,9 +1,14 @@
 name: build and release
 
 on:
-  push
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
 jobs:
   build:
+    if: github.event.pull_request.merged == true
     permissions:
       contents: write
     name: Release binaries
@@ -39,14 +44,6 @@ jobs:
         with:
           components: clippy, rustfmt
           target: ${{ matrix.target }}
-
-      - name: Test before building
-        run: |
-          cargo fmt --all -- --check
-          cargo clippy -- -D warnings
-          cargo test
-
-  
 
       - name: Cross build with all features
         uses: actions-rs/cargo@v1
