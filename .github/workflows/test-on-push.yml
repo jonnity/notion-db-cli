@@ -25,7 +25,10 @@ jobs:
         uses: devcontainers/ci@v0.3
         with:
           push: never
-          runCmd: cargo test
+          runCmd: |
+            cargo fmt --all -- --check
+            cargo clippy -- -D warnings
+            cargo test
 
       - name: slack notification for test failures
         if: ${{ failure() }}

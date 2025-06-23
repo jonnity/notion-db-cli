@@ -1,0 +1,103 @@
+name: build and release
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+jobs:
+  build:
+    if: github.event.pull_request.merged == true
+    permissions:
+      contents: write
+    name: Release binaries
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: notion-cli-rs
+            asset_name: notion-cli-rs-x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            artifact_name: notion-cli-rs
+            asset_name: notion-cli-rs-x86_64-unknown-linux-musl
+          - os: ubuntu-latest
+            target: x86_64-pc-windows-gnu
+            artifact_name: notion-cli-rs.exe
+            asset_name: notion-cli-rs-x86_64-pc-windows-gnu.exe
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: notion-cli-rs
+            asset_name: notion-cli-rs-x86_64-apple-darwin
+
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+          target: ${{ matrix.target }}
+
+      - name: Cross build with all features
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true 
+          command: build
+          args: --release --target ${{ matrix.target }} --all-features --verbose
+      - name: Read release.md and use it as a body of new release
+        id: read_release
+        shell: bash
+        run: |
+          r=$(cat path/to/release.md)                       # <--- Read release.md (Provide correct path as per your repo)
+          r="${r//'%'/'%25'}"                               # Multiline escape sequences for %
+          r="${r//$'\n'/'%0A'}"                             # Multiline escape sequences for '\n'
+          r="${r//$'\r'/'%0D'}"                             # Multiline escape sequences for '\r'
+          echo "RELEASE_BODY=$r" >> $GITHUB_OUTPUT          # <--- Set environment variable
+  
+          
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@2.10.0
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+          asset_name: ${{ matrix.asset_name }}
+          tag: ${{ github.head_ref }}
+          overwrite: true
+          body: |
+            ${{ steps.read_release.outputs.RELEASE_BODY }}  # <--- Use environment variables that was created earlier
+  
+  notify-success:
+    name: Slack notification on success
+    if: ${{ success() }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Slack notification for success
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_TITLE: "✅ Deploy succeeded: ${{ github.ref_name }}"
+          SLACK_COLOR: good
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_MESSAGE: "🎉 Build and deploy for *${{ github.ref_name }}* succeeded!"
+
+  notify-failure:
+    name: Slack notification on failure
+    if: ${{ failure() }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Slack notification for failure
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_TITLE: "❌ Deploy failed: ${{ github.ref_name }}"
+          SLACK_COLOR: danger
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_MESSAGE: "🚨 Build or test failed in *${{ github.ref_name }}*"
+        

@@ -7,13 +7,12 @@ use notion_client::{
     },
     objects::{
         database::{self, DatabaseProperty},
-        page::{DatePropertyValue, Page, PageProperty, SelectPropertyValue},
+        page::{DatePropertyValue, PageProperty, SelectPropertyValue},
         rich_text::{RichText, Text},
     },
 };
 use regex::Regex;
 use serde_json::Number;
-use url;
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -44,10 +43,8 @@ impl NotionClient {
     pub fn new(token: String) -> Result<Self, String> {
         let client = Client::new(token, None);
         match client {
-            Ok(client) => return Ok(Self { client: client }),
-            Err(e) => {
-                return Err(format!("Fail to obtain a client.\n{}", e));
-            }
+            Ok(client) => Ok(Self { client }),
+            Err(e) => Err(format!("Fail to obtain a client.\n{}", e)),
         }
     }
     pub async fn list_database(&self) -> Result<Vec<DatabaseListResult>, String> {
@@ -65,12 +62,7 @@ impl NotionClient {
             .search_by_title(list_database_request)
             .await;
         match response {
-            Err(e) => {
-                return Err(format!(
-                    "Fail to obtain the list of databases. {}",
-                    e.to_string()
-                ));
-            }
+            Err(e) => Err(format!("Fail to obtain the list of databases. {}", e)),
             Ok(response) => {
                 let mut database_list: Vec<DatabaseListResult> = vec![];
                 for page_or_database in response.results {
@@ -81,7 +73,7 @@ impl NotionClient {
                         });
                     };
                 }
-                return Ok(database_list);
+                Ok(database_list)
             }
         }
     }
@@ -91,12 +83,7 @@ impl NotionClient {
         database_id: &str,
     ) -> Result<Vec<DatabaseViewResult>, String> {
         match self.retrieve_database(database_id).await {
-            Err(e) => {
-                return Err(format!(
-                    "Fail to retrieve the databases information. {}",
-                    e.to_string()
-                ));
-            }
+            Err(e) => Err(format!("Fail to retrieve the databases information. {}", e)),
             Ok(database) => {
                 let mut database_properties: Vec<DatabaseViewResult> = vec![];
                 for (key, property) in database.properties {
@@ -106,7 +93,7 @@ impl NotionClient {
                         example: get_example_for_database_property(&property.clone()),
                     })
                 }
-                return Ok(database_properties);
+                Ok(database_properties)
             }
         }
     }
@@ -131,6 +118,7 @@ impl NotionClient {
         }
 
         let mut parsed_properties = BTreeMap::<String, PageProperty>::new();
+        let dates_regex = Regex::new(r"from\s+(\S+)\s+to\s+(\S+)").unwrap();
         for (key, property) in target_db.properties {
             let input_value = properties.get(&key as &str).unwrap();
             match property {
@@ -153,7 +141,6 @@ impl NotionClient {
                     );
                 }
                 DatabaseProperty::Date { .. } => {
-                    let dates_regex = Regex::new(r"from\s+(\S+)\s+to\s+(\S+)").unwrap();
                     let date_property = if dates_regex.is_match(input_value) {
                         let (start_date, end_date) = dates_regex
                             .captures(input_value)
@@ -431,27 +418,27 @@ impl NotionClient {
             .await
         {
             Ok(res) => {
-                let pages: Vec<Page> = res.results.iter().map(|page| page.clone()).collect();
+                let pages = res.results;
                 let keys: Vec<String> = pages
-                    .get(0)
+                    .first()
                     .unwrap()
                     .properties
-                    .iter()
-                    .map(|(key, _)| key.to_string())
+                    .keys()
+                    .map(|key| key.to_string())
                     .collect();
                 let properties_list: Vec<Vec<String>> = pages
                     .iter()
                     .map(|page| {
                         page.properties
-                            .iter()
-                            .map(|(_, property)| get_property_value_str(property))
-                            .collect::<Vec<String>>()
+                            .values()
+                            .map(get_property_value_str)
+                            .collect()
                     })
                     .collect();
 
                 Ok(DatabaseQueryResult {
-                    keys: keys,
-                    properties_list: properties_list,
+                    keys,
+                    properties_list,
                     has_more: res.has_more,
                 })
             }
@@ -465,8 +452,8 @@ impl NotionClient {
     ) -> Result<database::Database, NotionClientError> {
         let database = self.client.databases.retrieve_a_database(database_id).await;
         match database {
-            Err(e) => return Err(e),
-            Ok(database) => return Ok(database),
+            Err(e) => Err(e),
+            Ok(database) => Ok(database),
         }
     }
 }
@@ -477,8 +464,7 @@ pub fn get_example_for_database_property(database_property: &DatabaseProperty) -
         DatabaseProperty::CreatedBy { .. } => "-".to_string(),
         DatabaseProperty::CreatedTime { .. } => "-".to_string(),
         DatabaseProperty::Date { .. } => {
-            return "2020-12-07T12:00:00Z/from 2020-12-08T12:00:00Z to 2020-12-09T12:00:00Z"
-                .to_string();
+            "2020-12-07T12:00:00Z/from 2020-12-08T12:00:00Z to 2020-12-09T12:00:00Z".to_string()
         }
         DatabaseProperty::Email { .. } => "foo@example.com".to_string(),
         DatabaseProperty::Files { .. } => "-".to_string(),
@@ -548,41 +534,38 @@ pub fn get_property_value_str(property: &PageProperty) -> String {
             created_by.name.clone().unwrap_or("".to_string())
         }
         PageProperty::CreatedTime { created_time, .. } => created_time.to_rfc2822(),
-        PageProperty::Date { date, .. } => match date {
-            Some(date) => {
-                if date.start.is_some() && date.end.is_some() {
-                    format!(
-                        "from {:?} to {:?}",
-                        date.start.clone().unwrap(),
-                        date.end.clone().unwrap()
-                    )
-                } else if date.start.is_some() {
-                    format!("{:?}", date.start.clone().unwrap())
-                } else {
-                    "".to_string()
-                }
+        PageProperty::Date {
+            date: Some(date), ..
+        } => {
+            if date.start.is_some() && date.end.is_some() {
+                format!(
+                    "from {:?} to {:?}",
+                    date.start.clone().unwrap(),
+                    date.end.clone().unwrap()
+                )
+            } else if date.start.is_some() {
+                format!("{:?}", date.start.clone().unwrap())
+            } else {
+                "".to_string()
             }
-            None => "".to_string(),
-        },
+        }
         PageProperty::Email { email, .. } => email.clone().unwrap_or("".to_string()),
         PageProperty::LastEditedBy { last_edited_by, .. } => {
             last_edited_by.name.clone().unwrap_or("".to_string())
         }
         PageProperty::LastEditedTime {
-            last_edited_time, ..
-        } => match last_edited_time {
-            Some(date) => date.to_rfc2822(),
-            None => "".to_string(),
-        },
+            last_edited_time: Some(last_edited_time),
+            ..
+        } => last_edited_time.to_rfc2822(),
         PageProperty::MultiSelect { multi_select, .. } => multi_select
             .iter()
             .map(|select| select.name.clone().unwrap_or("".to_string()))
             .collect::<Vec<String>>()
             .join("/"),
-        PageProperty::Number { number, .. } => match number {
-            Some(number) => number.to_string(),
-            None => "".to_string(),
-        },
+        PageProperty::Number {
+            number: Some(number),
+            ..
+        } => number.to_string(),
         PageProperty::People { people, .. } => people
             .iter()
             .map(|user| user.name.clone().unwrap_or("".to_string()))
@@ -596,61 +579,57 @@ pub fn get_property_value_str(property: &PageProperty) -> String {
             .map(|rich_text| rich_text.plain_text().unwrap_or("".to_string()))
             .collect::<Vec<String>>()
             .join(""),
-        PageProperty::Select { select, .. } => match select {
-            Some(select) => select.name.clone().unwrap_or("".to_string()),
-            None => "".to_string(),
-        },
-        PageProperty::Status { status, .. } => match status {
-            Some(select) => select.name.clone().unwrap_or("".to_string()),
-            None => "".to_string(),
-        },
+        PageProperty::Select {
+            select: Some(select),
+            ..
+        } => select.name.clone().unwrap_or("".to_string()),
+        PageProperty::Status {
+            status: Some(select),
+            ..
+        } => select.name.clone().unwrap_or("".to_string()),
         PageProperty::Title { title, .. } => title
             .iter()
             .map(|rich_text| rich_text.plain_text().unwrap_or("".to_string()))
             .collect::<Vec<String>>()
             .join(""),
         PageProperty::Url { url, .. } => url.clone().unwrap_or("".to_string()),
-        PageProperty::UniqueID { unique_id, .. } => match unique_id {
-            Some(unique_id) => format!(
-                "{}{}",
-                unique_id.prefix.clone().unwrap_or("".to_string()),
-                match &unique_id.number {
-                    Some(number) => number.to_string(),
-                    None => "".to_string(),
-                }
-            ),
-            None => "".to_string(),
-        },
-        PageProperty::Verification { verification, .. } => match verification {
-            Some(verification) => {
-                let mut verification_str = match verification.state {
-                    notion_client::objects::page::VerificationState::Verified => {
-                        "verified".to_string()
-                    }
-                    notion_client::objects::page::VerificationState::Unverified => {
-                        "unverified".to_string()
-                    }
-                };
-                if let Some(user) = &verification.verified_by {
-                    if let Some(name) = &user.name {
-                        verification_str += &format!(" by {}", name.clone());
-                    }
-                }
-                if let Some(date) = &verification.date {
-                    if let Some(start_date) = &date.start {
-                        if let Some(end_date) = &date.end {
-                            verification_str +=
-                                &format!(" (from {:?} to {:?})", start_date, end_date);
-                        } else {
-                            verification_str += &format!(" ({:?})", start_date);
-                        }
-                    }
-                } else {
-                }
-                verification_str
+        PageProperty::UniqueID {
+            unique_id: Some(unique_id),
+            ..
+        } => format!(
+            "{}{}",
+            unique_id.prefix.clone().unwrap_or("".to_string()),
+            match &unique_id.number {
+                Some(number) => number.to_string(),
+                None => "".to_string(),
             }
-            None => "".to_string(),
-        },
+        ),
+        PageProperty::Verification {
+            verification: Some(verification),
+            ..
+        } => {
+            let mut verification_str = match verification.state {
+                notion_client::objects::page::VerificationState::Verified => "verified".to_string(),
+                notion_client::objects::page::VerificationState::Unverified => {
+                    "unverified".to_string()
+                }
+            };
+            if let Some(user) = &verification.verified_by {
+                if let Some(name) = &user.name {
+                    verification_str += &format!(" by {}", name.clone());
+                }
+            }
+            if let Some(date) = &verification.date {
+                if let Some(start_date) = &date.start {
+                    if let Some(end_date) = &date.end {
+                        verification_str += &format!(" (from {:?} to {:?})", start_date, end_date);
+                    } else {
+                        verification_str += &format!(" ({:?})", start_date);
+                    }
+                }
+            }
+            verification_str
+        }
         _ => "".to_string(),
     }
 }
