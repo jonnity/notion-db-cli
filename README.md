@@ -1,4 +1,4 @@
-# notion-cli-rs
+# notion-db-cli
 
 A CLI tool for Notion.so built with Rust.
 
