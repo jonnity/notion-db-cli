@@ -55,11 +55,11 @@ jobs:
         id: read_release
         shell: bash
         run: |
-          r=$(cat ./release.md)                       # <--- Read release.md (Provide correct path as per your repo)
-          r="${r//'%'/'%25'}"                               # Multiline escape sequences for %
-          r="${r//$'\n'/'%0A'}"                             # Multiline escape sequences for '\n'
-          r="${r//$'\r'/'%0D'}"                             # Multiline escape sequences for '\r'
-          echo "RELEASE_BODY=$r" >> $GITHUB_OUTPUT          # <--- Set environment variable
+          r=$(cat ./release.md)
+          r="${r//'%'/'%25'}"
+          r="${r//$'\n'/'%0A'}"
+          r="${r//$'\r'/'%0D'}"
+          echo "RELEASE_BODY=$r" >> $GITHUB_OUTPUT
   
           
       - name: Upload binaries to release
@@ -71,7 +71,7 @@ jobs:
           tag: ${{ github.head_ref }}
           overwrite: true
           body: |
-            ${{ steps.read_release.outputs.RELEASE_BODY }}  # <--- Use environment variables that was created earlier
+            ${{ steps.read_release.outputs.RELEASE_BODY }}
   
   notify-success:
     name: Slack notification on success
