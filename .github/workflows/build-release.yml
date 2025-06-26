@@ -60,8 +60,7 @@ jobs:
           r="${r//$'\n'/'%0A'}"
           r="${r//$'\r'/'%0D'}"
           echo "RELEASE_BODY=$r" >> $GITHUB_OUTPUT
-  
-          
+            
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@2.10.0
         with:
