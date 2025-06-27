@@ -56,6 +56,9 @@ jobs:
         shell: bash
         run: |
           r=$(cat ./release.md)
+          r="${r//'%'/'%25'}"
+          r="${r//$'\n'/'%0A'}"
+          r="${r//$'\r'/'%0D'}"
           echo "RELEASE_BODY=$r" >> $GITHUB_OUTPUT
             
       - name: Upload binaries to release
