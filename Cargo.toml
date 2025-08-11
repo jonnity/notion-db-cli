@@ -11,6 +11,6 @@ email-address-parser = "2.0.0"
 notion-client = "1.0.10"
 regex = "1.11.1"
 serde_json = "1.0.140"
-tokio = { version = "1.45.1", features = ["full"] }
+tokio = { version = "1.47.1", features = ["full"] }
 url = "2.5.4"
 openssl = { version = "0.10.73", features = ["vendored"] }
